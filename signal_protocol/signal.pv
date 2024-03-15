@@ -1,0 +1,86 @@
+free c:channel.
+type key [private].
+type pkey [private].
+type skey[private].
+type sskey[private].
+fun pk(skey): pkey.
+free zero :pkey.
+free subj: bitstring [private].
+free k : key [private].
+
+fun senc(bitstring,pkey,key):bitstring.
+reduc forall m:bitstring ,l:key,p:pkey ; sdec(senc(m,p,l),l)=m.
+fun comb(pkey,pkey):pkey.
+fun HASH(bitstring,bitstring,bitstring):bitstring.
+fun aenc(bitstring,pkey):bitstring .
+fun sharekey(pkey,skey):sskey.
+fun MAC(sskey):skey.
+reduc forall p:pkey , s:skey ; HKDF(MAC(sharekey(p,s)),p) = p.
+
+reduc forall m: bitstring , k: skey ; adec(aenc(m, pk(k)),k) = m.
+fun sign (bitstring,skey):bitstring .
+reduc forall m: bitstring , k:skey ; checksign(sign(m,k),pk(k))= m.
+
+query attacker (k).
+
+
+
+
+
+let Bob (pkB:pkey,skB:skey, kme:key) = 
+in (c,pkx:pkey);
+new m: bitstring;
+out (c, sign(m,skB));
+in (c, x:bitstring);
+let(=x, pkx1:pkey) = adec(x,skB) in
+new password:bitstring;
+new subj:bitstring;
+new uuid:bitstring;
+out (c, aenc(senc(HASH(password,subj,uuid),pkB,kme),pkx1));
+in (c,cla:bitstring);
+let cla0:bitstring = adec(cla,skB) in
+let (kl0:bitstring,pkc0:pkey)= adec(cla0,skB) in
+0.
+
+let Alice (pkA:pkey,skA:skey) =
+out (c, pkA);
+in (c,pky:pkey);
+in (c,ln:bitstring);
+let (y:bitstring,sky:skey )= checksign(ln,pky) in
+out (c,aenc((HKDF(skA,pkA),y),pky));
+in (c,pkz:pkey);
+in (c, z:bitstring);
+let (zn:bitstring,skz:skey)=checksign(z,pkz) in
+out (c, aenc((HKDF(skA,pkA),z),pkz));
+in (c, ab:bitstring);   
+let ac:bitstring =adec(ab,skA) in
+out(c,aenc(ac,pkz)).
+
+
+
+let Clara (pkC:pkey,skC:skey,kme:key) =
+new m:bitstring;
+out(c,sign(m,skC));
+in (c, x1:bitstring);
+let (=m,pkx0:pkey)= adec(x1,skC) in
+in (c, ac1:bitstring);
+let ac10 =adec(ac1,skC) in
+let (=kme,pkb0:pkey,ac11:bitstring) = sdec(ac10,kme) in
+new kl :bitstring;
+out (c,aenc((kl,pkC),pkb0)).
+
+
+
+
+
+
+
+process
+       
+       new sk0 : skey;
+       
+       new l:key;
+
+       
+       let sk=pk(sk0)in out ( c, sk );
+           (!Bob(sk,sk0,l))|(!Alice(sk,sk0))|(!Clara(sk,sk0,l))
