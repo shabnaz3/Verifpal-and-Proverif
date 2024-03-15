@@ -1,0 +1,53 @@
+attacker[active]
+
+principal Nodes[ 
+    knows private skNsN1,skNsN3,pheromone_message 
+    subjS = HASH(pheromone_message) 
+    ms  = AEAD_ENC(skNsN1,subjs,nil) 
+    ms1 = AEAD_ENC(skNsN3,subjS,nil) 
+]
+Nodes ->Node1:[ms] 
+principal Node1[    
+    knows private skNsN1,skN1N2 
+    generates seqN1_01 
+    ms_dec = AEAD_DEC(skNsN1,ms,nil)? 
+    msg_for_n2 = CONCAT(ms_dec,seqN1_01)
+    ms_n1_to_n2 = AEAD_ENC(skN1N2,msg_for_n2,seqN1_01)
+]
+Node1 ->Node2:[ms_n1_to_n2],[seqN1_01] 
+principal Node2[
+    knows private skN1N2,skN2ND
+    generates seqN2_01 ,nonce
+    ms_n1_to_n2dec= AEAD_DEC(skN1N2,ms_n1_to_n2,seqN1_01)
+    ms_n1_to_n2dec_,seqN1_01_ = SPLIT(ms_n1_to_n2dec)
+    _= ASSERT(seqN1_01,seqN1_01_)
+    m2Nd= CONCAT(ms_n1_to_n2dec_,seqN1_01_,seqN2_01)
+    m = AEAD_ENC(skN2ND,ms_n1_to_n2dec,seqN2_01)
+]
+
+Nodes ->Node3 :[ms1]
+
+principal Node3[
+    knows private skNsN3, skN3ND
+    generates N3_01 
+    ms1_dec =AEAD_DEC(skNsN3,ms1,nil)
+    msg_for_n3tond=CONCAT(ms1_dec,N3_01)
+    ms1_N3_to_ND = AEAD_ENC(skN3ND,msg_for_n3tond,N3_01)
+]
+
+Node3 ->NodeD:[ms1_N3_to_ND],[N3_01]
+
+principal NodeD[
+    knows private skN2ND,skN3ND, pheromone_message
+    subjD = HASH(pheromone_message)
+    ms1_N3_to_ND_dec,N3_01_ =SPLIT(AEAD_DEC(skN3ND,ms1_N3_to_ND,N3_01))    
+]
+Node2 ->NodeD:[m]
+
+queries[
+    equivalence? ms1_N3_to_ND_dec,subjD
+    authentication? Nodes->Node1:ms
+    authentication? Node1 ->Node2:ms_n1_to_n2
+    authentication? Nodes ->Node3: ms1
+    authentication? Node3 ->NodeD:ms1_N3_to_ND
+]
