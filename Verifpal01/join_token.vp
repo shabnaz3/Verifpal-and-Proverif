@@ -1,0 +1,46 @@
+//this is signature without attribute
+attacker[active]
+
+principal Alice[
+    knows private a
+    ga = G^a
+    knows public username_alc
+   
+]
+//Alice -> Bob : username_alc
+
+principal Bob[
+    knows private b
+    gb = G^b
+    knows public username_bob
+]
+//Bob -> Alice: username_bob
+
+principal Alice[
+    msgA = CONCAT(username_alc,ga)
+    sgnA = SIGN(a,msgA)
+]
+Alice ->Bob : [sgnA],[msgA],ga
+
+principal Bob[
+    username_alc_,ga_ = SPLIT(msgA)
+    storage = SIGNVERIF(ga,msgA,sgnA)?  
+]
+
+principal Bob[
+    msgB = CONCAT(username_bob,gb)
+    sgnB = SIGN(b,msgB)
+     
+]
+Bob ->Alice : sgnB,msgB,gb
+principal Alice[
+    username_bob_,gb_ = SPLIT(msgB)
+    proof = SIGNVERIF(gb,msgB,sgnB)? 
+]
+
+queries[  
+    confidentiality? username_alc      // user obtain the information because it is public
+    authentication? Alice -> Bob:sgnA
+    authentication? Bob -> Alice:sgnB
+   
+]
