@@ -1,0 +1,125 @@
+attacker[active]
+
+principal Bob[
+knows public bob
+]
+principal Alice[
+  knows public alice
+  knows public bob
+  generates nonce
+  non = HASH(nonce)
+  uuid = CONCAT(alice,bob,non)
+  //uuid = HASH(alice,bob,non) // eikhane hash use kora jabe na karon jokhon destination primitive check korbe o kivabe bujhbe kon kon host er public value nibe
+  // eta kon logic er moddhe pore na
+]
+Alice -> KDC : [uuid] ,non // what is theory of third bracket 
+principal KDC[
+   knows public kdc
+   alice_,bob_,non_ = SPLIT(uuid)
+   //uuid_ = HASH(alice,bob,non_)
+   // _= ASSERT(uuid,uuid_)?
+   _= ASSERT(alice,alice_)?
+    _= ASSERT(bob,bob_)?
+]
+
+
+principal KDC[
+knows private k 
+gk = G^k 
+sig = SIGN(k,non_)
+]
+KDC -> Alice :[gk],[sig]  //Adding brackets around gs “guards” it against replacement by the active attacker.
+KDC -> Bob :[gk],[non_],[sig]
+principal Alice[
+   vrf = SIGNVERIF(gk,non,sig)? 
+   knows private a
+   ga = G^a
+   ka_ = gk^a
+   sig_alice = SIGN(a,non)
+]
+Alice -> KDC :[ga],[sig_alice]
+
+principal KDC [
+  vrf1 = SIGNVERIF(ga, non_,sig_alice)?
+   ka= ga^k // ka define is secret key of KDC and alice
+]
+principal Bob[
+
+vrf_k = SIGNVERIF(gk,non_,sig)?
+knows private b
+kb_ = gk^b
+gb = G^b
+sig_b = SIGN(b,nil)
+]
+bob -> KDC :[sig_b],[gb]
+principal KDC[
+    verf_b = SIGNVERIF(gb,nil,sig_b)?
+    kb =gb^k //kb define is  secret key of KDC and bob
+]
+
+principal KDC[
+    generates ks 
+    m1 = CONCAT(ks,uuid)
+    //enc = ENC(ka,m1)
+    m_b = CONCAT(ks,alice_)
+    for_bob =ENC(kb,m_b)
+    m_ = CONCAT(m1,for_bob)
+    //enc_final =AEAD_ENC(ga, enc,for_bob)
+    message = ENC(ka,m_)
+
+]
+KDC -> Alice : [message] //enc_final,[for_bob]
+
+principal Alice[
+    message_dec = DEC(ka_,message)
+    m1_,for_bob_ = SPLIT(message_dec)
+    ks_,uuid_ = SPLIT(m1_)
+]
+
+Alice -> Bob  : [for_bob_]
+
+principal Bob[
+    for_bob_Dec =DEC(kb_,for_bob_)
+    ks_0,alice_1 = SPLIT(for_bob_Dec)
+    _ = ASSERT(alice, alice_1)?
+
+    generates nonce2
+    for_alice = ENC(ks_0,nonce2)
+]
+Bob -> Alice :[for_alice]
+principal Alice[
+    for_alice_dec = DEC(ks_,for_alice)
+    f_n2 = CONCAT(ga,for_alice_dec)
+    again_msg_for_bob = ENC(ks_,f_n2)
+]
+Alice -> Bob :[again_msg_for_bob]
+principal Bob[
+    again_msg_for_bob_dec = DEC(ks_0, again_msg_for_bob)
+    ga_,nonce2_ = SPLIT(again_msg_for_bob_dec)
+    _= ASSERT(nonce2,nonce2_)?
+]
+
+
+principal Clara [
+ knows public clara
+]
+
+queries [
+
+ //authentication? Alice -> KDC : uuid
+ //equivalence? bob,bob_
+ //authentication? KDC -> Alice :sig
+ //equivalence? ka, ka_
+ //equivalence? kb,kb_
+ //authentication? KDC -> Alice : sig
+  //equivalence? alice,alice_
+  //authentication? KDC -> Alice : message
+   //authentication? Alice -> Bob  : for_bob_
+   //equivalence? alice_, alice_1
+   //confidentiality? ks
+   //equivalence? nonce2,nonce2_
+   //equivalence? ks_,ks_0 
+   //confidentiality?  nonce2
+   authentication?  Alice -> Bob:again_msg_for_bob
+
+]
