@@ -1,0 +1,133 @@
+attacker[active]
+
+//setup
+
+principal Alice[
+    knows private a
+    ga= G^a
+    knows private a0
+    generates ab
+]
+
+principal key[]
+
+principal Carl[
+  knows private c
+  gc=G^c
+  knows private c0
+  generates ca
+]
+
+Alice -> Server : [ab],[a0]
+
+principal Server[
+    knows private s
+    knows private b0
+]
+
+principal key[
+    knows private a0
+]
+
+principal Server[
+       generates bpk // taking about Bob 
+       sb = AEAD_ENC(b0,CONCAT(a0,bpk),nil)
+       sa =AEAD_ENC(a0,CONCAT(ab,bpk,sb),nil)
+]
+
+Server -> Alice :[sa]
+principal Alice[
+     sa_d = AEAD_DEC(a0,sa,nil)
+     ab_,bpk_,sb_ =SPLIT(sa_d)
+]
+
+Carl ->Server :[ca],c0
+
+principal Key[
+   knows private c0
+]
+
+principal Server[
+    generates csa
+    sac= AEAD_ENC(a0,CONCAT(c0,csa),nil)
+    sc=AEAD_ENC(c0,CONCAT(ca,csa,sac),nil)
+]
+
+Server -> Carl :[sc]
+
+principal Carl[
+      sc_d = AEAD_DEC(c0,sc,nil)
+      ca_,csa_,sac_ =SPLIT(sc_d)
+]
+Carl ->Alice :[sac_]
+
+principal Alice[
+       sac_d=AEAD_DEC(a0,sac_,nil)
+      c0_,csaa_ = SPLIT(sac_d)
+]
+
+Alice -> Bob :[sb_]
+principal Bob[
+      knows private b
+      gb=G^b
+      knows private b0
+]
+
+principal Bob[     
+      sb_d =AEAD_DEC(b0,sb_,nil)
+      a0_,bpk_B= SPLIT(sb_d)
+      proof= SIGN(b,bpk_B)
+      a0_enc= AEAD_ENC(a0_,bpk_B,proof)
+]
+
+Bob -> Alice :[a0_enc],[gb],proof
+
+principal Alice[
+    a0_enc_dec =AEAD_DEC(a0,a0_enc,proof)
+    valid= SIGNVERIF(gb,bpk_,proof)
+    generates m
+    sgn = SIGN(a,m)
+]
+
+Alice -> Bob:[ga],m,sgn
+Alice -> Carl:[ga],m,sgn
+
+principal Bob[
+      record = SIGNVERIF(ga,m,sgn)?
+      generates nb0
+      gnb0 = G^nb0
+      BAshare= ga^b
+      generates m2
+      knows public p0, p1
+      b01,b02 = HKDF(BAshare,ga,gb)
+      e1 = AEAD_ENC(b01,m2,HASH(ga,gb,gnb0))
+]
+
+Bob -> Alice :[gnb0],e1
+
+principal Carl[
+        verify =SIGNVERIF(ga,m,sgn)
+        generates m00
+        evidenc= SIGN(c,m00)
+]
+
+Carl -> Alice :evidenc,[gc],m00
+
+
+principal Alice[
+      storage = SIGNVERIF(gc,m00,evidenc)?
+      knows public p0,p1
+      ABshare=gb^a
+      A01,A02 = HKDF(ABshare,gb,ga)
+      e1_= AEAD_DEC(A01,e1,HASH(ga,gb,gnb0))?   
+]
+
+queries[
+   confidentiality? m2
+   authentication? Bob -> Alice :proof
+   authentication? Alice -> Bob:sgn
+   authentication? Alice -> Carl :sgn
+   authentication? Carl-> Alice :evidenc
+   authentication? Bob -> Alice : e1
+]
+
