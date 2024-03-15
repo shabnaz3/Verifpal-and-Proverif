@@ -1,0 +1,72 @@
+free c:channel.
+type key [private].
+type pkey [private].
+type skey[private].
+type sskey[private].
+free k : key [private].
+fun share_Key(pkey,pkey):sskey.
+
+fun pk(key):pkey.
+fun sk(key):skey.
+
+fun HASH(bitstring,bitstring):bitstring.
+fun aenc(pkey,bitstring):bitstring.
+
+reduc forall m:bitstring, l:key ; adec(aenc(pk(l),m),sk(l)) = m.
+
+fun ssk(key):sskey.
+fun enc(sskey,bitstring): bitstring.
+reduc forall m:bitstring, l:key ; dec(enc(ssk(l),m),ssk(l))= m.
+query attacker (k).
+
+let client1(pk1:pkey,sk1:skey)=
+new m11 :bitstring;
+new m12 :bitstring;
+out (c,(HASH(m11,m12),pk1));
+in (c, (m0_1:bitstring, pks1_:pkey));
+in (c,(m00_client2:bitstring,pk2_:pkey));
+in (c, m0_2:bitstring);
+new data: bitstring;
+new pk10:pkey;
+out (c,aenc(pks1_,aenc(pk2_,(data,pk10))));
+in (c, m_fr_server:bitstring);
+let m_fr_client2 :bitstring = adec(m_fr_server,sk1) in
+let mes_:bitstring = dec(m_fr_client2, share_Key(pk2_,pk10)) in
+0.
+
+let server(pks1:pkey,sks:skey)=
+in (c,(m0:bitstring,pk1_:pkey));
+new digital_certificate1 : bitstring ;
+out (c, (HASH(m0,digital_certificate1),pks1) ); (*eikhane amra sym encryption korte partam*)
+in (c, (m00:bitstring,pk2_:pkey));
+new digital_certificate2 : bitstring;
+out (c, (HASH(m00,digital_certificate2),pks1)) ;
+in (c,m_frm_c1_for_c2:bitstring);
+let m_for_cl2:bitstring = adec(m_frm_c1_for_c2,sks) in
+out (c, aenc(pk2_,m_for_cl2));
+
+in (c, m002:bitstring);
+let m_for_client1 :bitstring = adec(m002,sks) in
+out(c,aenc(pk1_,m_for_client1)).
+
+let client2(pk2: pkey,sk2:skey)= 
+in (c, m0_1 :bitstring);
+new m21:bitstring;
+new m22:bitstring;
+out(c, (HASH(m21,m22),pk2));
+in (c, (m0_2:bitstring,pks1_:pkey));
+in (c, a_e_m:bitstring);
+let a_e_m_1 :bitstring = adec (a_e_m,sk2) in
+let (data:bitstring, pk10_:pkey)= adec(a_e_m_1,sk2) in
+
+new mes: bitstring;
+out (c,aenc(pks1_,enc(share_Key(pk2,pk10_),mes) ) ).
+
+
+process
+  new sk0 : skey;
+  new l  :key;     
+      
+
+     let sk=pk(l)in out ( c, sk );
+           (!client1(sk,sk0))|(!server(sk,sk0))|(!client2(sk,sk0))
