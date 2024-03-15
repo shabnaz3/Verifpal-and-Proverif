@@ -1,0 +1,76 @@
+free c: channel.
+type key [private].
+type pkey [private].
+type skey [private].
+fun pk(key):pkey.
+fun sky(key):skey.
+free k : key [private].
+
+
+fun sign (bitstring,skey):bitstring .
+reduc forall m: bitstring , k:key ; checksign(sign(m,sky(k)),pk(k))= m.
+
+fun aenc(bitstring,pkey):bitstring .
+reduc forall m: bitstring , k: key ; adec(aenc(m, pk(k)),sky(k)) = m.
+
+fun comb(pkey,key):pkey.
+
+reduc forall m:bitstring, k:key  ; HKDF(comb(pk(k),k),k) = sky(k). 
+
+
+query attacker (k).
+
+let Bob (pkB:pkey,skB:skey, kB:key) = 
+in (c,pkx:pkey);
+in (c,mx:bitstring);
+let (x:bitstring,skx:skey )= checksign(mx,pkx) in
+new m0 :bitstring ;
+out (c, aenc(m0 , pkx));
+in (c,mz00:bitstring);
+let mz00_:bitstring = adec(mz00,skB) in
+let (mn_:bitstring,k_:key) = adec(mz00_,skB) in
+out (c,aenc(aenc((mn_,kB),comb(pkB,k_)),pkx)).
+
+
+let Alice (pkA:pkey,skA:skey) =
+out (c, pkA);
+in (c,pky:pkey);
+new m: bitstring;
+out (c, sign(m,skA));
+in(c,my:bitstring);
+let my_ = adec(my,skA) in
+in (c,pkz:pkey);
+in (c,mz:bitstring);
+let (mz_:bitstring,skz:skey) = checksign(mz,pkz) in
+out(c,aenc((mz_,pky),pkz ));
+in (c,mz0:bitstring);
+let mz0_:bitstring = adec(mz0,skA) in
+out(c,aenc(mz0_,pky));
+in(c,my00:bitstring);
+let my001:bitstring =adec(my00,skA) in
+out (c,aenc(my001,pkz)).
+
+let Clara(pkC:pkey,skC:skey)=
+out (c,pkC);
+in(c,pkx0:pkey);
+new m1 :bitstring;
+out(c, sign(m1,skC));
+in (c,mx0:bitstring);
+let (=m1, pky0:pkey) =adec(mx0,skC) in
+new mn:bitstring;
+new k :key;
+out (c,aenc(aenc((mn,k),pky0),pkx0));
+in (c,my0010:bitstring);
+let my001_:bitstring =adec(my0010,skC) in
+let (=mn, k_:key) = adec(my001_,HKDF(pky0,k)) in
+0.
+
+
+process
+       new sk0 : skey;
+       
+       new l:key;
+
+       
+       let sk=pk(l)in out ( c, sk );
+           (!Bob(sk,sk0,l))|(!Alice(sk,sk0))|(!Clara(sk,sk0))
