@@ -1,0 +1,41 @@
+attacker[active]
+
+principal A[
+	knows private a
+        ga=G^a
+        knows public a0
+        generates m0b
+]
+
+principal Key[]
+
+A -> Server: m0b
+
+principal Server[
+         knows private s
+         gs = G^s
+         knows public s0
+         knows private b0
+]
+principal Key[
+    knows public a0
+]
+
+Server -> A: [b0]
+
+principal Server[
+        generates asb
+       inc = ENC(a0,asb)
+]
+
+Server -> B:[inc] ,[a0]
+
+principal B[
+      knows private b
+      gsb= ga^b
+       dnc =DEC(a0,inc)?
+]
+
+queries[
+    authentication? Server -> B : [inc]
+]
