@@ -1,0 +1,145 @@
+attacker[active]
+
+principal Bob[
+knows private b
+gb = G^b
+generates bo
+gbo = G^bo
+sig = SIGN(b,gbo)
+]
+
+Bob -> Alice:[sig],[gb],[gbo]
+
+principal Alice[
+knows private a
+ga = G^a
+vrf = SIGNVERIF(gb,gbo,sig)  
+sharekey_a = gb^a
+a_snd1,a_snd2 = HKDF(MAC(sharekey_a,nil),nil,nil)
+]
+principal Alice[
+generates ae
+gae = G^ae
+generates m1
+enc1 = AEAD_ENC(a_snd1,m1,HASH(ga,gb,gae))
+]
+
+Alice -> Bob :enc1,[ga],[gae]
+
+
+principal Bob[
+sharekey_b = ga^b 
+b_rec_1, b_rec_2 = HKDF(MAC(sharekey_b,nil),nil,nil)
+dec1 = AEAD_DEC(b_rec_1,enc1,HASH(ga,gb,gae))
+]
+principal Bob[
+generates be
+gbe = G^be
+sharekey_b2 = gae^be
+sharekey_b2_hash10,sharekey_b2_hash20 = HKDF(MAC(sharekey_b2,nil),nil,nil)
+]
+principal Bob[
+generates m2 
+enc2 = AEAD_ENC(sharekey_b2_hash10,m2,HASH(ga,gb,gbe))
+]
+
+Bob -> Alice :enc2,[gbe]
+
+
+
+principal Alice[
+sharekey_a2 = gbe^ae
+sharekey_a2_hash_10,sharekey_a2_hash_20 = HKDF(MAC(sharekey_a2,nil),nil,nil)
+dec2 = AEAD_DEC(sharekey_a2_hash_10,enc2,HASH(ga,gb,gbe))
+]
+
+principal clara[
+knows private c 
+gc = G^c
+generates co
+gco = G^co
+sigc = SIGN(c,gco)
+]
+clara -> Alice :[sigc],[gc],[gco]
+
+principal Alice[
+sigc_V = SIGNVERIF(gc,gco,sigc)  
+sharekey_Ac = gc^a
+Ac_pub_hash1_sharekey_10 ,Ac_pub_hash1_sharekey_00 = HKDF(MAC(sharekey_Ac,nil),nil,nil)
+]
+principal Alice[
+generates a_c
+enc_c = AEAD_ENC(Ac_pub_hash1_sharekey_10,a_c,ga)
+]
+
+Alice -> clara :enc_c,[ga]
+
+principal clara[
+sharekey_Ca = ga^c
+Ca_pub_hash_sharekey10 ,Ca_pub_hash_sharekey00 = HKDF(MAC(sharekey_Ca,nil),nil,nil)
+dec_a = AEAD_DEC(Ca_pub_hash_sharekey10, enc_c, ga)
+
+]
+
+principal clara[
+knows private bco
+generates mc ,mbco, ca 
+gca =G^ca
+secret = ENC(bco,mbco)
+]
+
+principal clara[
+sharekeya_c2 = ga^ca
+sharekeya_c2_10,sharekeya_c_00 =HKDF(MAC(sharekeya_c2,nil),nil,nil)
+enc2_a = AEAD_ENC(sharekeya_c2_10,secret,nil)
+
+]
+
+clara -> Alice :[enc2_a],[gca]
+
+principal Alice[
+sharekeyc_a2 = gc^a
+sharekeyc_a2_10,sharekeyc_a2_00 = HKDF(MAC(sharekeyc_a2,nil),nil,nil)
+dec2_c = AEAD_DEC(sharekeyc_a2_10,enc2_a,nil)
+]
+
+
+Alice -> Bob :[dec2_c],[gc]
+
+
+principal Bob[
+knows private bco
+secret_dec = DEC(bco, dec2_c)
+]
+
+principal Bob[
+sig_to_c = SIGN(b,gc)    
+]
+
+Bob -> clara :[sig_to_c],[gb]
+
+principal clara[
+_ = SIGNVERIF(gb,gc,sig_to_c)
+]
+
+
+
+
+
+
+
+
+
+
+queries[
+   // confidentiality? secret
+    //confidentiality? m2
+    //authentication? Bob -> Alice:sig
+    //authentication? Alice -> Bob:enc1
+    //authentication? Bob -> Alice :enc2
+    //authentication? clara -> Alice :sigc
+    //authentication? Alice -> clara :enc_c
+    //authentication? clara -> Alice : enc2_a
+    //authentication? Alice -> Bob : for_bob
+    authentication? Bob -> clara :[sig_to_c]
+]
