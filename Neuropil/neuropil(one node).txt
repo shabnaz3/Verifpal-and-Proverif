@@ -1,0 +1,58 @@
+
+        
+    #message delivery
+import string
+from base64 import encode
+from neuropil import NeuropilNode, NeuropilCluster, neuropil, np_token, np_message
+import sys
+
+def let_user_pick(options):
+    print("Please choose:")
+
+    for idx, element in enumerate(options):
+        print("{}) {}".format(idx + 1, element))
+
+    i = input("Enter number: ")
+    try:
+        if 0 < int(i) <= len(options):
+            return int(i) - 1
+    except:
+        pass
+    return None
+
+
+options = ["sender","reciver"]
+res = let_user_pick(options)
+j = options[res]
+print(j)
+port_index=1
+port = int(input("s="))
+subject=str(input("a="))
+log_file_prefix= str(input())
+
+np_1 = NeuropilNode(port + port_index,log_file=f"{log_file_prefix}_i.log")
+print(np_1)
+
+mxp1 = np_1.get_mx_properties(subject) # make propertis with subj and node sending to reciver
+mxp1.ackmode = neuropil.NP_MX_ACK_DESTINATION # get acknowlegement from  neuropil destination so mxp1 = np_1
+mxp1.apply()
+
+def authz_cb(node:NeuropilNode, token: np_token): # for data authorization very important
+    print("authorizing")
+    return True
+
+np_1.set_authorize_cb(authz_cb)
+np_1.set_authorize_cb(authz_cb)
+np1_addr = np_1.get_address()
+
+def msg_received( node:NeuropilNode, message:np_message): 
+    print(message.raw())
+    return True
+
+if j=="receiver":
+    np_1.set_receive_cb(subject, msg_received)
+
+while np_1.run(1) == neuropil.np_ok:
+    if j== "sender":
+        print("sending data")
+        np_1.send(subject,"data")
