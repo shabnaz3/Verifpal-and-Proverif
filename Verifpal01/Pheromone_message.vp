@@ -1,0 +1,97 @@
+attacker[active]
+
+principal Nodes[ // Source Node.source node is connected node1,node2 and node3
+    knows private skNsN1,skNsN3,skNsN2,pheromone_message // defining the secrest key and subject 
+    subjS = HASH(pheromone_message) // pheromone messahe caary only hash value of subject, so creating hash value
+    ms  = AEAD_ENC(skNsN1,subjs,nil) // source node spread the hash value of subject using transport layer security
+    ms1 = AEAD_ENC(skNsN3,subjS,nil) // previos one
+    ms2 = AEAD_ENC(skNsN2,subjS,nil) // previous one
+]
+Nodes ->Node1:[ms] // sending message without sequence number because it transmite from root
+
+principal Node1[     //    Node1 which is connected with node2 and node3
+    knows private skNsN1,skN1N2,skN1N3 // defining secret key
+    generates seqN1_01 // generate sequence number. Since message is forward from a node to another node , node add sequence number untill it reachs the destination
+    ms_dec = AEAD_DEC(skNsN1,ms,nil)? // decryp the message that it get from source node
+]
+Nodes ->Node2:[ms2] // sourec node transmites the hash value of subject to  node2 . Node2 is connected with Node4 also
+principal Node2[
+    knows private skNsN2,skN1N2,skN2N4
+    generates N201
+    ms2_dec = AEAD_DEC(skNsN2,ms2,nil)
+]
+Nodes ->Node3:[ms1] // source transmite the hash vaule to node3.becuse source node is connected node1,node2 and node3
+principal Node3[
+    knows private skNsN3,skN1N3,skN3ND // defining secret key
+    ms1_dec = AEAD_DEC(skNsN3,ms1,nil)? // decrypt message that it got from source node
+]
+principal Node1[    //Node1 is connected wit node2 and node3
+    msg= CONCAT(ms_dec,seqN1_01) //it forwards the message with it sequence number
+    m2_N1toN2 = AEAD_ENC(skN1N2, msg,seqN1_01) // encrypt with its secret key  and sequence number and it transmite from node 1 to node2
+    m2_N1toN3 = AEAD_ENC(skN1N3,msg,seqN1_01) // encrypt with its secret key  and sequence number and it transmite from node 1 to node3
+]
+Node1 ->Node2:[m2_N1toN2],[seqN1_01] 
+
+principal Node2[     
+    m2_N1toN2_dec = AEAD_DEC(skN1N2,m2_N1toN2,seqN1_01) // node2 decrypt node 1 message
+    ms_dec_,seqN1_01_ = SPLIT(m2_N1toN2_dec) // split the message and sequence number
+]
+
+Node1 ->Node3:[m2_N1toN3],[seqN1_01] 
+
+principal Node3[
+    m2_N1toN3_dec = AEAD_DEC(skN1N3,m2_N1toN3,seqN1_01)? // node3 decrypt node1 message
+    ms_dec_1,seqN1_01_3 = SPLIT(m2_N1toN3_dec) // split the message
+] 
+
+principal Node2[ // Since Node2 is connected with node4 .now it transmit  all message to node4
+    msg2_from_Ns =CONCAT(ms2_dec,N201) // node 2 add sequence number with hash value(source node)
+    msg_from_N1 = CONCAT(ms_dec_,seqN1_01_,N201) // node  add sequence number with message of node1
+    m_forward_NstoN4 = AEAD_ENC(skN2N4,msg2_from_Ns,N201) // forwarding source node messge to node4
+    m_forward_N1toN4 = AEAD_ENC(skN2N4,msg_from_N1,N201) // forwarding node1's message to node4
+]
+
+Node2 ->Node4:[m_forward_N1toN4],[N201]
+principal Node4[   // Node4 is connected with NodeD(=Destination Noder)
+    knows private  skN2N4,skN4ND
+    m_for_N4_dec = AEAD_DEC(skN2N4,m_forward_N1toN4,N201)
+    ms2_dec_,n201_=SPLIT(m_for_N4_dec)
+]
+Node2 ->Node4:[m_forward_NstoN4]
+
+principal Node4[ // when it will forward the message , it add sequence number again. that why we didn't show its encryption
+    m_for_NstoN4_dec = AEAD_DEC(skN2N4,m_forward_NstoN4,N201)
+    ms_dec_0,seqN1_01_0,N201_0 = SPLIT(m_for_NstoN4_dec) 
+] 
+
+principal Node3[ // it encrypts the message what it gets from Node1 and sorce node
+    generates N3_01 // generate sequence number
+    msg_N3= CONCAT(ms1_dec,N3_01) // create the message with sequence number
+    ms_node3to_Node1 = AEAD_ENC(skN1N3,msg_N3,N3_01) // encrypt the message for node1
+    ms_node3to_NodeD = AEAD_ENC(skN3ND,msg_N3,N3_01) // encrypt the message for  source node
+]   
+
+Node3 ->Node1:[ms_node3to_Node1],[N3_01] // node3 forward  source node's message to node1
+
+principal Node1[
+    ms_node3to_Node1_dec = AEAD_DEC(skN1N3,ms_node3to_Node1,N3_01)?
+    s1_dec_0,N3_01_ = SPLIT(ms_node3to_Node1_dec)
+]
+
+Node3 ->NodeD:[ms_node3to_NodeD],[N3_01] //Node3 transmit the hash value to node 2
+
+principal NodeD[
+    knows private skN4ND,skN3ND,pheromone_message 
+    subjD = HASH(pheromone_message)
+    ms_node3to_NodeD_dec = AEAD_DEC(skN3ND, ms_node3to_NodeD,N3_01)? // nodeD decrypt node3
+    ms1_dec_,N3_01_D = SPLIT(ms_node3to_NodeD_dec)
+    
+]
+
+
+
+queries[
+    confidentiality? ms
+    equivalence? ms1_dec_,subjD
+    equivalence?ms2_dec_,ms_dec_0
+]
