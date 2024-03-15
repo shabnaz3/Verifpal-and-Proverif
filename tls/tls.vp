@@ -1,0 +1,72 @@
+/ first tls er txt file ta porte hobe specially wiki ta thn oikhnae digital signature username and pubkey diye ready korte bolse.tai ami Hash use kortesi
+
+
+attacker[active]
+
+
+principal client1[
+knows  private a
+generates uuida,usd
+knows public ap 
+knows public bp
+ga = G^a
+h1= HASH(uuida,usd) 
+]
+
+client1 -> server:[h1] // 1.client send hash function via server
+
+principal server[
+    generates vlu1
+digital_certificate = HASH(h1,ap,vlu1) //2. server add nonce value and create digital certificate
+]
+server -> client1:[digital_certificate]
+server -> client2 : [h1]  //3. forward hash function to client2
+
+
+principal client2[
+knows private b
+gb = G^b
+generates uuidb
+knows public bp
+h2 = HASH(uuidb,b)
+]
+client2 -> server:[h2] //4.client2 send hash value to create digital Certificate
+
+principal server[
+generates vlu2
+h2_1 = HASH(h2,bp,vlu2)
+]
+server -> client2:[h2_1]
+server ->client1 :[h2_1] //5.create and forward
+
+principal client1[
+generates data
+d0 = HASH(data)
+e1 = AEAD_ENC(bp,d0,ga) //6creating a message with fresh value
+]
+client1 -> server:[e1],[ga]
+server -> client2 :[e1],[ga]  //7 server forward the message
+principal client2[
+e1_dec = AEAD_DEC(b,e1,ga)  
+share_key = ga^b 
+generates ok
+e2 = ENC(share_key,ok)
+]
+client2 -> server:[e2],[gb]
+principal server[
+e2_1 = AEAD_ENC(ga,e2,gb)
+]
+server ->client1:[e2_1],[gb]
+
+principal client1[
+e2_1_dec = AEAD_DEC(a,e2_1,gb)
+share_key1 =gb^a 
+e2_dec = DEC(share_key1,e2_1_dec)
+]
+queries[
+	
+    confidentiality? data
+  
+    authentication? server -> client2 :e1
+    authentication? server ->client1:e2_1
+]
