@@ -1,0 +1,162 @@
+attacker[active]
+principal Bob[
+knows private b
+gb = G^b
+generates bo
+gbo = G^bo
+sig = SIGN(b,gbo)
+]
+
+Bob -> Alice:[sig],[gb],[gbo]
+
+
+principal Alice[
+knows private a
+ga = G^a
+vrf = SIGNVERIF(gb,gbo,sig)
+mm = HASH(gb^a,gbo^a)  
+mm1,mm2 = HKDF(mm,nil,nil)
+sharekey_a = gb^a
+sharekey_a_mm1_1, sharekey_a_mm1_2 = HKDF(sharekey_a,mm1,nil)
+a_snd1,a_snd2 = HKDF(mac(sharekey_a_mm1_1,nil),nil,nil)
+generates ae
+gae = G^ae
+generates m1
+enc1 = AEAD_ENC(a_snd1,m1,HASH(ga,gb,gae))
+]
+Alice -> Bob :enc1,[ga],[gae]
+
+principal Bob[
+nn = HASH(ga^b, ga^bo) 
+nn1,nn2 = HKDF(nn,nil,nil)
+sharekey_b = ga^b 
+sharekey_b_nn1,sharekey_b_nn2  = HKDF(sharekey_b, nn1,nil)
+b_rec_1, b_rec_2 = HKDF(mac(sharekey_b_nn1,nil),nil,nil)
+dec1 = AEAD_DEC(b_rec_1,enc1,HASH(ga,gb,gae))
+]
+principal Bob[
+generates be
+gbe = G^be
+sharekey_b2 = gae^be
+sharekey_b2_hash = HASH(sharekey_b2,sharekey_b_nn1) 
+sharekey_b2_hash1,sharekey_b2_hash2 = HKDF(sharekey_b2_hash,nil,nil)
+sharekey_b2_hash10,sharekey_b2_hash20 = HKDF(MAC(sharekey_b2_hash1,nil),nil,nil)
+generates m2 
+enc2 = AEAD_ENC(sharekey_b2_hash10,m2,HASH(ga,gb,gbe))
+]
+Bob -> Alice :enc2,[gbe]
+principal Alice[
+sharekey_a2 = gbe^ae
+sharekey_a2_hash = HASH(sharekey_a2, sharekey_a_mm1_1)
+sharekey_a2_hash_1, sharekey_a2_hash_2 = HKDF(sharekey_a2_hash,nil,nil)
+sharekey_a2_hash_10,sharekey_a2_hash_20 = HKDF(MAC(sharekey_a2_hash_1,nil),nil,nil)
+dec2 = AEAD_DEC(sharekey_a2_hash_10,enc2,HASH(ga,gb,gbe))
+]
+
+principal clara[
+knows private c 
+gc = G^c
+generates co
+gco = G^co
+sigc = SIGN(c,gco)
+]
+clara -> Alice :[sigc],[gc],[gco]
+
+principal Alice[
+sigc_V = SIGNVERIF(gc,gco,sigc)  
+Ac_pub_hash = HASH(gc^a,gco^a)
+Ac_pub_hash1,Ac_pub_hash2 = HKDF(Ac_pub_hash,nil,nil)
+sharekey_Ac = gc^a
+Ac_pub_hash1_sharekey_1 , Ac_pub_hash1_sharekey_0 = HKDF(sharekey_Ac,Ac_pub_hash1,nil) 
+Ac_pub_hash1_sharekey_10 ,Ac_pub_hash1_sharekey_00 = HKDF(MAC(Ac_pub_hash1_sharekey_1,nil),nil,nil)
+]
+principal Alice[
+generates a_c
+enc_c = AEAD_ENC(Ac_pub_hash1_sharekey_10,a_c,HASH(gc,gco,ga))
+]
+
+Alice -> clara :enc_c,[ga]
+principal clara[
+Ca_pub_hash = HASH(ga^c,ga^co)
+Ca_pub_hash1, Ca_pub_hash0 = HKDF(Ca_pub_hash,nil,nil)
+sharekey_Ca = ga^c
+Ca_pub_hash_sharekey1 ,Ca_pub_hash_sharekey0 = HKDF(sharekey_Ca,Ca_pub_hash1,nil)
+Ca_pub_hash_sharekey10 ,Ca_pub_hash_sharekey00 = HKDF(MAC(Ca_pub_hash_sharekey1,nil),nil,nil)
+dec_a = AEAD_DEC(Ca_pub_hash_sharekey10, enc_c, HASH(gc,gco,ga) )
+
+]
+
+principal clara[
+knows private bco
+generates mc ,mbco, ca 
+gca =G^ca
+secret = ENC(bco,mbco)
+]
+
+principal clara[
+sharekeya_c2 = ga^ca
+sharekeya_c2_1,sharekeya_c_0 = HKDF(sharekeya_c2,nil,nil)
+sharekeya_c2_10,sharekeya_c_00 =HKDF(MAC(sharekeya_c2_1,nil),nil,nil)
+enc2_a = AEAD_ENC(sharekeya_c2_10,mc,secret)
+
+]
+
+clara -> Alice :enc2_a,[gca],[secret]
+
+principal Alice[
+sharekeyc_a2 = gc^a
+sharekeyc_a2_1,sharekeyc_a2_0 = HKDF(sharekeyc_a2,nil,nil)
+sharekeyc_a2_10,sharekeyc_a2_00 = HKDF(MAC(sharekeyc_a2_1,nil),nil,nil)
+dec2_c = AEAD_DEC(sharekeyc_a2_10,enc2_a,secret)
+]
+
+principal Alice[
+generates ab  
+gab = G^ab
+sharekey_ab = gbe^ab
+sharekey_ab_1, sharekey_ab_0 = HKDF(sharekey_ab,nil,nil)
+sharekey_ab_10,sharekey_ab_00 = HKDF(MAC(sharekey_ab_1,nil),nil,nil)
+enc_bbb = AEAD_ENC(sharekey_ab_10,secret,gc)
+]
+Alice -> Bob :[enc_bbb],[gab],[gc]
+
+principal Bob[
+sharekey_ba2 = gab^be
+sharekey_ba2_1, sharekey_ba2_0 = HKDF(sharekey_ba2,nil,nil)
+sharekey_ba2_10,sharekey_ba_2_0 = HKDF(MAC(sharekey_ba2_1,nil),nil,nil)
+dec_bbb = AEAD_DEC(sharekey_ba2_10,enc_bbb,gc)
+
+]
+principal Bob[
+knows private bco
+secret_dec = DEC(bco,dec_bbb)
+]
+
+principal Bob[
+sig_to_c = SIGN(b,gc)    
+]
+
+Bob -> clara :[sig_to_c],[gb]
+
+principal clara[
+_ = SIGNVERIF(gb,gc,sig_to_c)?
+]
+
+phase[1]
+principal Alice[leaks a]
+principal Bob[leaks b]
+principal clara[leaks c]
+
+
+queries[
+    //confidentiality? secret
+    //confidentiality? m2
+    //authentication? Bob -> Alice:sig
+    //authentication? Alice -> Bob:enc1
+    //authentication? Bob -> Alice :enc2
+    //authentication? clara -> Alice :sigc
+    authentication? Alice -> clara :enc_c
+    //authentication? clara -> Alice : enc2_a
+    //authentication? Alice -> Bob : for_bob
+    // authentication? Bob -> clara :[sig_to_c]
+]
