@@ -1,0 +1,117 @@
+// the purpose of join message verify the handshake message fingerprint . Limitation: join message is not modified by attacker
+
+
+// join token in easy way
+
+attacker[active]
+
+principal Alice[ // handshake message of node token
+    knows public hostA, Port_A,alice // 1. hostA,PortA  is part of node and  2.alice is username of identity
+    knows private a,skA // a= private key of node , skA= secret/ private key of Identity
+    ga = G^a
+    generates sigAN,sgA // sigAN defines pure signate of node and sgA is identity signature  excluding  attribute
+    nfpA= HASH(hostA,Port_A,sigAN) // pure fingerprint of node
+    ht_A = CONCAT(hostA,Port_A,nfpA,sigAN,ga) // handshake token with signature
+    sgnA = SIGN(a,ht_A)
+   
+]
+Alice -> Bob : [ht_A],[sgnA] // transmitting handshake token with  handshake signature
+
+principal Bob[
+    knows public hostB, Port_B,bob
+    knows private b,skB
+    gb = G^b
+    generates sigBN,sgB
+    nfpB= HASH(hostB,Port_B,sigBN)
+    ht_B = CONCAT(hostB,Port_B,nfpB,sigBN,gb)
+    sgnB = SIGN(b,ht_B)
+]
+
+Bob -> Alice : [ht_B],[sgnB]
+
+principal Bob[
+    hostA_,Port_A_,nfpA_,sigAN_,ga_ = SPLIT(ht_A)
+    storage = SIGNVERIF(ga_,ht_A,sgnA)?
+    shB = ga_^b       // creating symmetric secret key using DHK algorithm
+    shB1,shB2 = HKDF(shB,nil,nil) // long length secret key is divided into two part using key distribution function
+]
+
+
+principal Alice[
+    hostB_,Port_B_,nfpB_,sigBN_,gb_ = SPLIT(ht_B)
+    proof = SIGNVERIF(gb_,ht_B,sgnB)?
+    shA = gb_^a 
+    shA1,shA2 = HKDF(shA,nil,nil)
+    
+]
+principal Alice[    //  for identity . Join message of identity with fingerprint of node token
+    subj = HASH(alice)    //hash(userdata)
+    gskA = G^skA        // public key of identity
+    ifp = HASH(alice,subj,sgA,gskA) //fingerprint of identity
+    JIdt_A = CONCAT(subj,nfpA,sgA,gskA) //Join token of identity
+    sgAN   = SIGN(skA,JIdt_A) // Identity join token signature with fingerprint of node
+    J1 = AEAD_ENC(shA1,JIdt_A,sgAN) // Encrpt message using 1st part of secret key 
+]
+
+Alice -> Bob : [J1],[sgAN]
+
+principal Bob[
+   J1_Dec = AEAD_DEC(shB1,J1,sgAN)?
+   subj_,nfpA0_,sgA_,gskA_ = SPLIT(J1_Dec)
+   storage1 = SIGNVERIF(gskA_,J1_Dec,sgAN)?
+]
+principal Alice[
+    htA_Join_token =CONCAT(ht_A,ifp,ga)
+    sig_A_J = SIGN(a,htA_Join_token) // Node join token signature with fingerprint of  identity
+    J2 = AEAD_ENC(shA1,htA_Join_token,sig_A_J) 
+]
+
+Alice -> Bob : [J2],[sig_A_J]
+
+principal Bob[
+   J2_Dec = AEAD_DEC(shB1,J2,sig_A_J)?
+   ht_A_,ifp_,ga0= SPLIT(J2_Dec)
+   storage2 = SIGNVERIF(ga0,J2_Dec,sig_A_J)?
+]
+
+principal Bob[    // identity
+    subjB = HASH(bob)    //hash(userdata)
+    gskB = G^skB        // public key of identity
+    ifpB = HASH(bob,subjB,sgB,gskB) //fingerprint of identity
+    JIdt_B = CONCAT(subjB,nfpB,sgB,gskB) //Join token of identity
+    sgBN   = SIGN(skB,JIdt_B) // Identity join token signature with fingerprint of node
+    J10  = AEAD_ENC(shB1,JIdt_B,sgBN)
+]
+Bob -> Alice : [J10],[sgBN]
+principal Alice[
+   J10_Dec = AEAD_DEC(shA1,J10,sgBN)
+   subjB_,nfpB0_,sgB_,gskB_ = SPLIT(J10_Dec)
+   proof1 = SIGNVERIF(gskB_,J10_Dec,sgBN)?
+]
+
+principal Bob[
+    htB_Join_token =CONCAT(ht_B,ifpB,gb)
+    sig_B_J = SIGN(b,htB_Join_token) // Node join token signature with fingerprint of  identity
+    J20 =AEAD_ENC(shB1,htB_Join_token,sig_B_J)
+]
+Bob -> Alice : [J20],[sig_B_J]
+
+principal Alice[
+   J20_Dec = AEAD_DEC(shA1,J20,sig_B_J)?
+   ht_B_,ifpB_,gb0= SPLIT(J20_Dec)
+   proof2 = SIGNVERIF(gb0,J20_Dec,sig_B_J)?
+]
+
+
+queries[  
+    authentication? Alice -> Bob : sgnA
+    authentication? Bob -> Alice : sgnB
+    authentication? Alice -> Bob :sgAN 
+    authentication? Alice -> Bob : sig_A_J
+    authentication? Bob -> Alice : sig_B_J
+    confidentiality? J1         //attacker can see only encrypted message cann't decrypt the message
+    confidentiality? sgA
+    equivalence? shA,shB
+    confidentiality? shA
+    confidentiality? shB
+]
