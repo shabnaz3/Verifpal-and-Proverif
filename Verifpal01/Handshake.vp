@@ -1,0 +1,56 @@
+ attacker[active]
+
+principal Alice_Node[
+   
+   knows public hostnameA,Port_A
+   generates signature1_ext,attr_hndshk
+   knows private a
+   ga =G^a
+   subject= CONCAT(hostnameA,Port_A) //creating subject
+   nodetoken= CONCAT(subject,ga)
+   hfp = HASH(nodetoken,signature1_ext) // pure fingerprint
+   token_A_attr = CONCAT(subject,signature1_ext,attr_hndshk,ga) //message for signatuer because it doesn't carry fingerprint
+]
+
+principal Bob_Node[
+   knows public hostnameB,Port_B
+   generates signature1_ext_B,attr_hndshk_B
+   knows private b
+   gb =G^b
+   subject_B= CONCAT(hostnameB,Port_B) //creating subject
+   nodetoken_B= CONCAT(subject_B,gb)
+   hfp_B = HASH(nodetoken_B,signature1_ext_B) // pure fingerprint
+   token_B_attr = CONCAT(subject_B,signature1_ext_B,attr_hndshk_B,gb)
+]
+
+principal Alice_Node[
+
+   sgn_A = SIGN(a,token_A_attr)
+   handshake_token = CONCAT(token_A_attr,hfp,ga)
+]
+
+Alice_Node->Bob_Node :[sgn_A],[handshake_token]
+
+principal Bob_Node[
+   token_A_attr_,hfp_,ga_= SPLIT(handshake_token) 
+   storage = SIGNVERIF(ga_,token_A_attr_, sgn_A)?
+      
+]
+principal Bob_Node[
+        sgn_B = SIGN(b,token_B_attr)
+        handshake_token_B = CONCAT(token_B_attr,hfp_B,gb)   
+
+]
+Bob_Node->Alice_Node :[sgn_B],[handshake_token_B]
+
+
+
+principal Alice_Node[
+   token_B_attr_,hfp_B_,gb_= SPLIT(handshake_token_B) 
+   proof = SIGNVERIF(gb_,token_B_attr_, sgn_B)?
+]
+
+queries[  
+    authentication? Alice_Node ->Bob_Node :sgn_A
+    authentication? Bob_Node ->Alice_Node :sgn_B
+]
