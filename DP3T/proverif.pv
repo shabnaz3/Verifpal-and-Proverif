@@ -1,0 +1,83 @@
+free c:channel.
+type key [private].
+type pkey .
+type skey[private].
+free zero:bitstring[private].
+
+
+fun skb(skey):bitstring.
+fun HASH(bitstring,bitstring):bitstring.
+fun HKDF(bitstring,bitstring,pkey):pkey.
+fun ENC(key,bitstring):bitstring.
+reduc forall k:key , m:bitstring ; Dec(k,ENC(k,m)) = m.
+fun CONCAT(bitstring,bitstring):bitstring.
+fun sk0(key):pkey.
+fun skk (key):skey.
+
+fun AEAD_ENC(key,bitstring,bitstring):bitstring.
+reduc forall k:key , m:bitstring,m0:bitstring; AEAD_DEC(k,AEAD_ENC(k,m,m0)) = m.
+
+query attacker (zero).
+
+
+
+let SmartphoneA(Broadcastkey:pkey,ephemeral_sk:key) =
+new  SK0A:bitstring;
+let EphID00A = HKDF(zero, SK0A, Broadcastkey) in
+out (c,EphID00A);
+in (c,EphID00B:pkey);
+in (c, infectedPatients0:bitstring);
+let SK1A = HASH(SK0A,zero) in
+let EphID10A = HKDF(zero,SK1A, Broadcastkey) in
+new fever:bitstring;
+let SK2A = HASH(fever,SK1A) in
+let EphID20A = HKDF(zero, SK2A, Broadcastkey) in 
+in (c, x:bitstring);
+let y = Dec(ephemeral_sk,x) in
+out(c, AEAD_ENC(ephemeral_sk,SK2A,y) ).
+
+
+
+let SmartphoneB(Broadcastkey:pkey)=
+new SK0B:bitstring;
+let EphID00B = HKDF(zero, SK0B, Broadcastkey)in
+out (c,EphID00B);
+in (c,EphID00A:pkey);
+in (c,EphID00C:pkey);
+in (c, infectedPatients0:bitstring);
+in (c,z:bitstring).
+
+let SmartphoneC(Broadcastkey:pkey)=
+in (c,EphID00B:pkey);
+new SK0C:bitstring;
+let EphID00C = HKDF(zero, SK0C, Broadcastkey) in
+out (c,EphID00C);
+in (c, infectedPatients0:bitstring);
+in (c,z:bitstring).
+
+let BackenServer(infectedPatients0:skey,ephemeral_sk:key)=
+out(c, skb(infectedPatients0));
+in(c,x0:bitstring);
+let x01 = Dec(ephemeral_sk,x0) in
+in (c,y:bitstring);
+let (y0:bitstring, =x01)  =AEAD_DEC(ephemeral_sk,y) in
+out(c,CONCAT(y0,skb(infectedPatients0))).
+
+
+let HealthAuthority(ephemeral_sk:key)=
+new triggerToken:bitstring;
+out (c, ENC(ephemeral_sk, triggerToken)).
+
+
+
+
+
+process
+       
+       new pko : key;
+       
+    
+
+       
+       let sk=HKDF(zero,zero,sk0(pko))in out ( c, sk );
+           (!SmartphoneA(sk,pko))|(!SmartphoneB(sk))|(!SmartphoneC(sk))|(!BackenServer(skk(pko),pko)|(!HealthAuthority(pko)))
