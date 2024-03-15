@@ -1,1 +1,126 @@
+attacker[active]
 
+principal Bob[
+knows private b
+gb = G^b
+generates bo
+gbo = G^bo
+sig = SIGN(b,gbo)
+]
+
+Bob -> Alice:[sig],[gb],[gbo]
+
+principal Alice[
+knows private a
+ga = G^a
+vrf = SIGNVERIF(gb,gbo,sig)  
+sharekey_a = gb^a
+a_snd1,a_snd2 = HKDF(MAC(sharekey_a,nil),nil,nil)
+]
+principal Alice[
+generates ae
+gae = G^ae
+generates m1
+enc1 = AEAD_ENC(a_snd1,m1,HASH(ga,gb,gae))
+]
+
+Alice -> Bob :enc1,[ga],[gae]
+
+
+principal Bob[
+sharekey_b = ga^b 
+b_rec_1, b_rec_2 = HKDF(MAC(sharekey_b,nil),nil,nil)
+dec1 = AEAD_DEC(b_rec_1,enc1,HASH(ga,gb,gae))
+]
+principal Bob[
+generates be
+gbe = G^be
+sharekey_b2 = gae^be
+sharekey_b2_hash10,sharekey_b2_hash20 = HKDF(MAC(sharekey_b2,nil),nil,nil)
+]
+principal Bob[
+generates m2 
+enc2 = AEAD_ENC(sharekey_b2_hash10,m2,HASH(ga,gb,gbe))
+]
+
+Bob -> Alice :enc2,[gbe]
+
+
+
+principal Alice[
+sharekey_a2 = gbe^ae
+sharekey_a2_hash_10,sharekey_a2_hash_20 = HKDF(MAC(sharekey_a2,nil),nil,nil)
+dec2 = AEAD_DEC(sharekey_a2_hash_10,enc2,HASH(ga,gb,gbe))
+]
+
+principal clara[
+knows private c 
+gc = G^c
+generates co
+gco = G^co
+sigc = SIGN(c,gco)
+]
+clara -> Alice :[sigc],[gc],[gco]
+
+principal Alice[
+sigc_V = SIGNVERIF(gc,gco,sigc)  
+sharekey_Ac = gc^a
+Ac_pub_hash1_sharekey_10 ,Ac_pub_hash1_sharekey_00 = HKDF(MAC(sharekey_Ac,nil),nil,nil)
+]
+principal Alice[
+generates a_c
+comb = CONCAT(ga,gb)
+enc_c = AEAD_ENC(Ac_pub_hash1_sharekey_10,a_c,comb)
+]
+
+Alice -> clara :enc_c,[ga],[comb]
+
+principal clara[
+sharekey_Ca = ga^c
+Ca_pub_hash1_sharekey_10 ,Ca_pub_hash1_sharekey_00 = HKDF(MAC(sharekey_Ca,nil),nil,nil)
+enc_c_dec = AEAD_DEC(Ca_pub_hash1_sharekey_10,enc_c,comb)
+]
+
+principal clara[
+ga_,gb_ = SPLIT(comb)
+generates username
+secret = AEAD_ENC(gb_,username,gc)
+message = AEAD_ENC(ga,secret,nil )
+]
+clara -> Alice :[message]
+
+principal Alice[
+message_= AEAD_DEC(a,message,nil)
+]
+Alice -> Bob : [message_],[gc]
+
+principal Bob[
+message_sec = AEAD_DEC(b,message_,gc)
+]
+
+principal Bob[
+generates bb1 
+gbb1 = G^bb1
+shr_k = gc^bb1
+msg_2_clara = AEAD_ENC(shr_k,message_sec,gbb1)
+comb1 = CONCAT(gc,gbb1)
+msg = AEAD_ENC(ga,msg_2_clara,comb1)
+]
+
+Bob -> Alice :[msg],[comb1]
+principal Alice[
+msg_dec = AEAD_DEC(a,msg,comb1)
+]
+Alice -> clara:[msg_dec],[comb1]
+
+principal clara[
+gc_,gbb1_ = SPLIT(comb1)
+shr_K_2 = gbb1_^c
+msg_dec_dec = AEAD_DEC(shr_k_2,msg_dec,gbb1_)
+
+]
+
+queries[
+
+authentication? Alice -> clara: msg_dec
+]
