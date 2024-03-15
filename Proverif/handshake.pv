@@ -1,0 +1,46 @@
+free c : channel .
+type key .
+fun senc ( bitstring , key ) : bitstring.
+type pkey.
+type skey.
+type spkey.
+type sskey.
+free authfail:bitstring.
+
+fun pk ( skey ) : pkey.
+fun aenc (bitstring , pkey ) : bitstring.
+reduc forall m: bitstring , k : key ; sdec (senc (m, k) ,k ) = m.
+reduc forall m: bitstring , k : skey ; adec ( aenc (m, pk ( k ) ) , k ) = m.
+
+fun sign ( bitstring , sskey ) : bitstring . 
+fun spk ( sskey ) : spkey .
+reduc forall m: bitstring , k : sskey; getmess (sign (m, k ) ) = m.
+reduc forall m: bitstring , k : sskey; checksign ( sign (m, k) , spk ( k ) ) = m.
+
+free s:bitstring [private] .
+query attacker(s).
+
+let clientA (pkA : pkey ,skA : skey ,pkB : spkey) =
+   out ( c , pkA ) ;
+   in ( c , x:bitstring ) ;
+   if x= authfail then
+     let y = adec (x , skA) in
+     let (=pkB, k: key ) = checksign ( y , pkB ) in
+     out (c , senc ( s , k )) .
+   
+   
+   
+let serverB (pkB : spkey , skB : sskey ) =
+   in ( c , pkX : pkey ) ;
+   new k : key ;
+   out ( c , aenc ( sign ( ( pkB , k ) , skB ) , pkX ) ) ;
+   in ( c , x : bitstring ) ;
+   let z = sdec ( x , k ) in
+     0 .
+
+process
+   new skA : skey ;
+   new skB : sskey ;
+   let pkA = pk ( skA ) in out ( c , pkA ) ;
+   let pkB = spk ( skB ) in out ( c , pkB ) ;
+   ( ( ! clientA (pkA , skA , pkB ) ) | ( ! serverB (pkB , skB ) ) )
