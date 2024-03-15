@@ -1,0 +1,82 @@
+attacker[active]
+
+// Introduction
+
+principal Alice[
+  generates w
+]
+
+
+principal Bob[
+ knows private b
+ b_pub_key=G^b
+ generates x
+]
+
+Alice→ Bob: w
+Bob→ Alice: x
+
+principal Alice[
+      knows private a 
+      a_pub_key=G^a
+]
+
+Alice→ Bob: [a_pub_key]
+
+principal Bob[
+  key_= a_pub_key^b
+]
+
+Bob→ Alice:[b_pub_key]
+
+principal Alice[
+   key=b_pub_key^a
+   generates w0
+   signature= SIGN(a,w0)
+]
+
+Alice→ Bob: signature
+
+principal Bob[
+    vrf = SIGNVERIF(a_pub_key,x,signature)
+    generates x0
+    signature_= SIGN(b,x0)
+]
+
+Bob→ Alice: signature_,[x0]
+
+principal Alice[
+valid = SIGNVERIF(b_pub_key,x0,signature_)? 
+] 
+principal Bob[
+   generates m
+   e1= AEAD_ENC(key_,m,b_pub_key)
+]
+Bob→ Alice:[e1]
+principal Alice[
+  e1_dec= AEAD_DEC(key,e1,b_pub_key)?
+]
+principal Alice[
+  generates f,h,i
+  gf=G^f
+  gh=G^h
+  comb= hash(key,gf,gh)
+  c3,c4=HKDF(comb,nil,nil)
+  ec= AEAD_ENC(c3,i,comb)
+]
+Alice→ Bob:[gf],gh,ec
+principal Bob[
+generates v
+  combB=HASH(gf^b,gh^v)
+  d1,d2= HKDF(combB,nil,nil)
+  m11=AEAD_DEC(d1,ec,HASH(gf,gh))
+]
+
+queries[
+	authentication? Alice→ Bob : signature
+	authentication? Bob→ Alice: signature_
+        authentication? Bob→ Alice: e1
+        authentication?Alice→ Bob:ec
+        confidentiality? m
+        equivalence? key,key_
+]
