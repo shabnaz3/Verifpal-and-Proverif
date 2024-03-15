@@ -1,0 +1,94 @@
+// message intent token with ephemeral key 
+attacker[active]
+
+principal ema[
+  knows private m,s,s1,s2
+  gs = G^s
+  mh = HASH(m)
+  sg = SIGN(s,mh)
+  mf =CONCAT(mh,gs,sg)
+  m1 = AEAD_ENC(s1,mf,nil)
+  m2 = AEAD_ENC(s2,mf,nil)
+]
+ ema->bob:[m2]
+
+principal bob[
+    knows private s2,s3,s4
+    m3 = AEAD_DEC(s2,m2,nil)
+    m4,m5,m6 = SPLIT(m3)
+    m60 =SIGNVERIF(m5,m4,m6)
+    generates r1,r3
+    m7 = CONCAT(r1,m4,m5,m6)
+    m8 = AEAD_ENC(s4,m7,nil)
+]
+
+ ema->della:[m1]
+
+principal della[
+    knows private s1,s3
+    m9 = AEAD_DEC(s1,m1,nil)
+    m10,m11,m12 = SPLIT(m9)
+    generates r2
+    m13 = CONCAT(r2,m10,m11,m12)
+    m14 = AEAD_ENC(s3,m13,nil)
+]
+ 
+ bob->alice:[m8]
+
+principal alice[
+  knows private s4,m,s6
+  mA = HASH(m)
+  gs6 = G^s6
+  sigA = SIGN(s6,mA)
+  generates epk
+  m15 = AEAD_DEC(s4,m8,nil)
+  m16,m17,m18,m19 = SPLIT(m15)
+  m19E = SIGNVERIF(m18,m17,m19)
+  m20 = CONCAT(mA,gs6,sigA)
+  sk = m18^s6
+  mg = AEAD_ENC(sk,epk,nil)
+  mg0 = CONCAT(m20,mg)
+  mg1 = AEAD_ENC(s4,mg0,nil)
+]
+ alice->bob:[mg1]
+
+principal bob[
+  mg2 = AEAD_DEC(s4,mg1,nil)
+  mg3,mg4 =SPLIT(mg2)
+  mg5,mg6,mg7 = SPLIT(mg3)
+  mg8 = CONCAT(mg5,mg6,mg7,r3)
+  mg9 = CONCAT(mg8,mg4)
+  mg10= AEAD_ENC(s2,mg9,nil)
+
+] 
+bob->ema:[mg10]
+
+principal ema[
+  mg11 = AEAD_DEC(s2,mg10,nil)
+  mg12,mg13 = SPLIT(mg11)
+  mg14,mg15,mg16,mg17 = SPLIT(mg12)
+  prf = SIGNVERIF(mg15,mg14,mg16)
+  sk1 = mg15^s
+  mg18 = AEAD_DEC(sk1,mg13,nil) // got ephemeral key
+
+
+]
+
+ 
+queries[
+    authentication? ema->bob:m2
+    equivalence? m5,gs
+    equivalence? m18,gs
+    equivalence?gs6,mg6
+    equivalence?mg11,mg9
+    equivalence?mg,mg4
+    equivalence? mg17,r3
+    equivalence? mg13, mg
+    equivalence? mg15,gs6
+    authentication? bob->ema:mg10
+    equivalence? sk,sk1
+    equivalence? mg18,epk
+    confidentiality? epk
+    confidentiality? mg
+
+] 
