@@ -1,0 +1,133 @@
+free c:channel.
+type key.
+type sessionkey.
+free keyid:key [private].
+free zero:bitstring.
+free one:bitstring.
+free two:bitstring.
+free authfail:bitstring.
+
+
+fun sessionKeyGen(key, bitstring):sessionkey.
+
+fun MAC(sessionkey, bitstring, bitstring): bitstring.
+
+
+query attacker(keyid).
+
+event authSuccess(sessionkey,bitstring).
+event macChecked(sessionkey,bitstring).
+query sk:sessionkey, mac:bitstring; event(authSuccess(sk,mac))==>event(macChecked(sk,mac)).
+
+
+letfun pp(x:bitstring)=
+       if x=zero then one
+       else if x=one then two
+       else if x=two then zero
+.
+
+letfun session_key_gen(eid:bitstring)=
+       let eidpp:bitstring = pp(eid) in
+       let sk = sessionKeyGen(keyid, eidpp) in
+       (eidpp,sk)
+.
+
+letfun update_counters(cid:bitstring,eid:bitstring, sk:sessionkey)=
+       if cid=two then (
+       	  let (eidpp:bitstring, newsk:sessionkey) = session_key_gen(eid) in
+	  (zero,eidpp, newsk)
+	)
+    	else let cidpp = pp(cid) in (cidpp,eid,sk)
+.
+
+letfun isGreatherThan(x:bitstring, y:bitstring)=
+       if x = zero && y <> zero then true
+       else if x=one  && y=two then true
+       else false
+.
+
+let s(cid:bitstring, eid:bitstring, sk:sessionkey)=
+
+    new msg:bitstring;
+    let (cid1:bitstring, eid1:bitstring, newsk:sessionkey) = update_counters(cid, eid, sk) in
+
+   
+    out(c,(cid1, msg));
+    out(c,(cid1,MAC(newsk,cid1,msg)));
+  
+    in(c,reply:bitstring);
+    if reply=authfail then
+     
+       let (cid2:bitstring, eid2:bitstring, newsk2:sessionkey) = update_counters(cid1, eid1, newsk) in
+     
+       out(c,(cid2,eid2));
+       out(c,(cid2,MAC(newsk2,cid2,eid2)));
+
+      
+       let (cid3:bitstring, eid3:bitstring, newsk3:sessionkey) = update_counters(cid2, eid2, newsk2) in
+     
+       out(c,(cid3,msg));
+       out(c,(cid3,MAC(newsk3,cid3,msg)));
+       0
+    else
+	event authSuccess(newsk,MAC(newsk,cid1,msg));
+	0
+.
+
+let r(cid:bitstring, eid:bitstring, sk:sessionkey)=
+   
+    let (cid1:bitstring, eid1:bitstring, newsk:sessionkey) = update_counters(cid, eid, sk) in
+
+   
+    in(c,(scid:bitstring,msg:bitstring));
+    in(c,(=scid,mac:bitstring));
+    
+    let maccheck=MAC(newsk, cid1,msg) in
+   
+    if mac=maccheck then
+      
+       event macChecked(newsk,maccheck);
+
+       0
+    else
+  
+	out(c, authfail);
+	
+	in(c,(scid1:bitstring,seid1:bitstring));
+	in(c,(=scid1,mac2:bitstring));
+	
+	let cidgt=isGreatherThan(cid1,scid1) in
+    	let eidgt=isGreatherThan(eid1,seid1) in
+
+	if cidgt && eidgt then
+	let cid2=scid1 in
+	let eid2=seid1 in
+
+	
+	let newsk2=sessionKeyGen(keyid, eid2) in
+	let verifmac=MAC(newsk2,cid2, eid2) in
+	
+	if verifmac=mac2 then
+	  
+    	   let (cid3:bitstring, eid3:bitstring, newsk3:sessionkey) = update_counters(cid2, eid2, newsk2) in
+	 
+	    in(c, (scid2:bitstring, msg2:bitstring));
+	    in(c, (=scid2, mac3:bitstring));
+	    let finalmac = MAC(newsk3,cid3, msg2) in
+            	
+	    	if finalmac=mac3 then
+		   0
+		else
+        	
+				0
+	    else
+		0
+
+.
+
+process
+	
+	let sk=sessionKeyGen(keyid, one) in
+	(
+		(!s(zero,zero,sk))|(!r(zero,zero,sk))
+	)
