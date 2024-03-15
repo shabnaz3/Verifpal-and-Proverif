@@ -1,0 +1,82 @@
+attacker[active]
+
+principal Elisa [
+generates eli
+knows private t 
+gt = G^t
+sigE = SIGN(t,eli)
+]
+Elisa  → Bob :[gt],[eli],[sigE]
+
+principal Bob[
+knows private o
+go =G^o
+generates bo
+sigE_V = SIGNVERIF(gt,eli,sigE)
+sigB = SIGN(o,bo)
+]
+
+Bob → Marbela :[go],[bo],[sigB]
+Bob → Elisa :[go],[bo],[sigB]
+
+principal Elisa[
+sigB_V = SIGNVERIF(go,bo,sigB)
+]
+
+principal Marbela[
+sigB_V0 = SIGNVERIF(go,bo,sigB)
+knows private a
+ga =G^a
+generates mar 
+sigM = SIGN(a,mar)
+
+]
+Marbela → Bob :[ga],[mar],[sigM] 
+
+principal Bob[
+sigMV = SIGNVERIF(ga, mar, sigM)
+]
+
+principal Marbela[
+
+knows private v 
+generates uuid,sub,realm,pass, omi
+haa = HASH(uuid,sub,realm,pass)
+em1 = AEAD_ENC(v,haa,nil)
+goa =go^a
+em0 = AEAD_ENC(goa,omi,em1)
+]
+
+Marbela → Bob :[em0],[em1]
+
+principal Bob[
+gao =ga^o
+em0_dec = AEAD_DEC(gao,em0,em1)
+gto =gt^o
+generates me  
+em10 = AEAD_ENC(gto,me,em1)
+]
+Bob → Elisa :[em10],[em1]
+
+
+principal Elisa[
+knows private v
+got = go^t 
+em10_dec = AEAD_DEC(got,em10,em1)
+em1_dec = AEAD_DEC(v,em1,nil)
+sig_f = SIGN(t,em1_dec)
+
+]
+Elisa  → Marbela : [gt],[em1_dec],[sig_f]
+
+principal Marbela [
+sigf_V = SIGNVERIF(gt,em1_dec,sig_f)
+
+]
+
+
+
+
+queries[
+    authentication? Bob → Elisa :  em1
+]
