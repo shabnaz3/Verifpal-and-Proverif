@@ -1,0 +1,73 @@
+attacker[active]
+
+principal A[
+	knows private a
+	knows public k_as
+	generates n_a
+]
+
+principal B[
+	knows private b
+	knows public k_bs
+	generates n_b
+]
+
+principal Server[
+	knows public k_as
+	knows public k_bs
+]
+
+principal key[]
+
+A -> Server: a, n_a
+
+principal Server[
+	generates k_ab
+	e_b = AEAD_ENC(k_bs, CONCAT(k_ab, a), nil)
+	e_a = AEAD_ENC(k_as, CONCAT(n_a, k_ab,e_b), nil)
+]
+
+Server -> A: [e_a]
+
+principal A[
+	e_a_dec = AEAD_DEC(k_as, e_a, nil)
+	n_a_response, k_ab_a, e_b_a = SPLIT(e_a_dec)
+	_ = ASSERT(n_a, n_a_response)?
+]
+
+A -> B: e_b_a
+
+principal B[
+	e_b_dec = AEAD_DEC(k_bs, e_b_a, nil)
+	k_ab_b, A_b = SPLIT(e_b_dec)
+	e_n_b = AEAD_ENC(k_ab_b, n_b, nil)
+]
+
+B -> A: e_n_b
+
+principal A[
+	n_b_a = AEAD_DEC(k_ab_a, e_n_b, nil)
+	n_b_minus_one = HASH(n_b_a)
+	e_n_b_minus_one = AEAD_ENC(k_ab_a, n_b_minus_one, nil)
+]
+
+A -> B: e_n_b_minus_one
+
+principal B[
+	n_b_minus_one_b = AEAD_DEC(k_ab_b, e_n_b_minus_one, nil)
+	_ = ASSERT(n_b_minus_one_b, HASH(n_b))?
+]
+
+phase[1]
+
+principal Server[
+	leaks k_ab
+]
+
+queries[
+	confidentiality? k_ab
+	confidentiality? n_b
+	authentication? A -> B: e_b_a
+	authentication? A -> B: e_n_b_minus_one
+	authentication? B -> A: e_n_b
+]
