@@ -1,0 +1,80 @@
+free c : channel . (* free channel *)
+
+type pkey .
+type skey[private].
+free Na: bitstring [private].
+
+fun pk ( skey ) : pkey [private] .  
+fun aenc ( bitstring , pkey ) : bitstring [private] . (* public key encryption *)
+reduc forall x : bitstring , y : skey ; adec ( aenc ( x , pk ( y ) ) , y ) = x .
+(*for signature and verify signature *)
+type spkey .
+type sskey.
+fun spk ( sskey ) : spkey .
+fun sign ( bitstring , sskey ) : bitstring .
+reduc forall x : bitstring , y : sskey ; getmess ( sign ( x , y ) ) = x .
+reduc forall x : bitstring , y : sskey ; checksign ( sign ( x , y ) , spk ( y ) ) = x .
+fun senc ( bitstring , bitstring ) : bitstring .
+reduc forall x : bitstring , y : bitstring ; sdec ( senc ( x , y ) , y ) = x .
+
+event beginBparam ( pkey ) .  (* which denotes Alice’s intention to initiate the protocol with an interlocutor whose public key is supplied as a parameter. *)
+event endBparam ( pkey ) .     (* which records Bob’s belief that he has completed the protocol with Alice.He supplies his public key pk(skB) as the parameter. *)
+                              
+event beginAparam ( pkey ) .  (* which is used by Bob to record the belief that the initiator whose public key is supplied as a parameter has commenced a run of the protocol with him *)
+
+(* which means that Alice believes she has successfully completed the protocol with Bob. This event is executed only when Alice believes she runs the protocol with Bob,
+that is, when pkX = pkB. Alice supplies her public key pk(skA) as the parameter. *)
+
+event endAparam ( pkey ) .  
+
+query x : pkey ;inj-event (endBparam ( x ))==> inj-event (beginBparam ( x )) . (* query x which is pkey , endBparam will be placed when beginBparam is finished*)
+query x : pkey ; inj-event (endAparam ( x ))==> inj-event (beginAparam ( x )) . 
+free secretANa :bitstring [private].
+free secretANb :bitstring [private].
+free secretBNa , secretBNb : bitstring [ private ].
+
+query attacker ( secretANa ) ;
+attacker ( secretANb ) ;
+attacker ( secretBNa ) ;
+attacker ( secretBNb ) .
+
+
+let processA (pkB : pkey , skA : skey ) =  
+in ( c , pkX : pkey ) ;
+event beginBparam (pkX ) ;
+new Na : bitstring ;
+out ( c , aenc ( ( Na, pk ( skA ) ) , pkX ) ) ;
+in ( c , m: bitstring ) ;
+
+let (=Na, NX: bitstring ) = adec (m, skA ) in
+out ( c , aenc (NX, pkX ) ) ;
+if pkX = pkB then
+event endAparam ( pk ( skA ) ) .
+(*out ( c , senc ( secretANa , Na ) ) ;*)
+(*out ( c , senc ( secretANb , NX) ) .*)
+
+
+let processB (pkA : pkey , skB : skey ) =
+in ( c , m: bitstring ) ;
+let (NY: bitstring , pkY : pkey ) = adec (m, skB ) in
+event beginAparam (pkY ) ;
+new Nb: bitstring ;
+out ( c , aenc ( (NY, Nb ) , pkY ) ) ;
+in ( c , m3: bitstring ) ;
+if Nb = adec (m3, skB ) then
+if pkY = pkA then
+event endBparam ( pk ( skB ) ) .
+(*out ( c , senc ( secretBNa , NY) ) ;*)
+(*out ( c , senc ( secretBNb , Nb ) )*)
+
+process
+
+
+out ( c , senc ( secretANa , Na) ) ;
+out (c,senc ( secretANb , Na));
+out (c,senc (secretBNa, Na)); 
+out (c, senc (secretBNb,Na)); 
+
+new skA : skey ; let pkA = pk ( skA ) in out ( c , pkA ) ;
+new skB : skey ; let pkB = pk ( skB ) in out ( c , pkB ) ;
+ ( ( ! processA (pkB , skA ) ) | ( ! processB (pkA , skB ) ) )
