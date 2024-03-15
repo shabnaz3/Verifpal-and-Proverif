@@ -1,0 +1,54 @@
+free c:channel.
+type key.
+type pk.
+type pkey.
+type skey.
+type spkey.
+type sskey [private].
+free s:bitstring [private].
+free authfail:bitstring.
+free pub:key.
+fun aenc (bitstring,pkey):bitstring.
+fun adec (bitstring,skey):bitstring.
+fun checksign(bitstring,spkey):bitstring.
+fun senc (bitstring,sskey ):key.
+fun sdec(bitstring,sskey):key.
+fun sign(bitstring,sskey):bitstring.
+fun comb(skey,sskey):spkey.
+free zero:pkey.
+free sg:spkey [private].
+free s1:skey.
+free s2:sskey[private].
+free g:bitstring [private] .
+query attacker(s2).
+
+let Sender (pkA : pkey , skA : skey , pkB : spkey ) =
+(*sender sends pka through the channel *)
+out ( c , pkA ) ;
+(*sender get it from reciver or it has this already*)
+in ( c , x : bitstring ) ;
+let y = adec ( x , skA ) in
+(* after using assymetric dycription  (x),we got y then using checksginfunction with pkb we got sskey *)
+let (=pkB , k : sskey ) = checksign ( y , pkB ) in
+out ( c , senc ( s , k ) ) .
+
+
+let Reciver (pkB : spkey , skB : sskey ) =
+in ( c , pkA : pkey ) ;
+new k : sskey ;
+out ( c , aenc ( sign ( ( pkB , k ) , skB ) , pkA ) ) ;
+(* it sends x to reciver and and get it from reciver thats mean it has kept x *)
+in ( c , x:bitstring ) ;
+let z = sdec ( x , k ) in
+  if senc(x, k) = senc ( s , k ) then
+  0.
+      
+process
+       
+       new skA : skey;
+       new skB: sskey;
+       
+
+       
+       let sk=comb(skA,skB)in out ( c, sk );
+           (!Sender(zero,skA,sk))|(!Reciver(sk,skB))
