@@ -1,0 +1,58 @@
+attacker[active]
+
+principal Bob[
+    knows private b
+    gb=G^b
+]
+
+Bob-> Alice:[gb]
+
+principal Alice[
+     knows private a
+     generates rqstaccept 
+     ga=G^a   
+     generates uuid,issuer,realm,audience
+     
+     m0=CONCAT(uuid,nil)
+     m1=CONCAT(m0,issuer)
+     m2=CONCAT(m1,realm)
+     m3=CONCAT(m2,audience)
+     x=CONCAT(audience,realm,issuer,uuid)
+     sig=SIGN(a,audience)
+     sharekey=gb^a
+     enc_=AEAD_ENC(sharekey,audience,m3)
+]
+
+Alice-> Bob:enc_,[ga],sig,[audience],[uuid]
+principal Bob[
+       sharekey_=ga^b
+       sig_verif=SIGNVERIF(ga, audience,sig)?
+       dec_= AEAD_DEC(sharekey_,enc_,audience)
+       m3_,auidence= SPLIT(dec_)
+       m30_,m2_= SPLIT(m3_)
+       m20_,m1_=SPLIT(m2_)
+       m10_,m0_ = SPLIT(m1_)
+       uuid_,nil_ =SPLIT(m0_)
+     
+       sigB =SIGN(b,uuid_)
+]
+Bob->Alice:[sigB]
+
+principal Alice[
+sigB_verify=SIGNVERIF(gb,uuid,sigB)
+generates mAB
+
+encA=AEAD_ENC(sharekey,mAB,nil)
+
+]
+
+Alice-> Bob:encA
+principal Bob[
+  encA_dec=AEAD_DEC(sharekey_,encA,nil)?
+]
+
+queries[
+      confidentiality? mAB
+      authentication? Alice->Bob:sig
+       authentication? Bob->Alice:sigB
+]
