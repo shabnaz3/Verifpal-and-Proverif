@@ -1,0 +1,77 @@
+free c:channel.
+type key [private].
+type pkey [private].
+type skey[private].
+type sskey[private].
+fun pk(skey): pkey.
+free zero :pkey.
+free subj: bitstring [private].
+
+fun senc(bitstring,pkey,key):bitstring.
+reduc forall m:bitstring ,l:key,p:pkey ; sdec(senc(m,p,l),l)=m.
+fun comb(pkey,pkey):pkey.
+fun HASH(bitstring,bitstring,bitstring):bitstring.
+fun aenc(bitstring,pkey):bitstring .
+
+reduc forall m: bitstring , k: skey ; adec(aenc(m, pk(k)),k) = m.
+fun sign (bitstring,skey):bitstring .
+reduc forall m: bitstring , k:skey ; checksign(sign(m,k),pk(k))= m.
+
+query attacker (subj).
+
+
+
+
+
+let Marbela (pkM:pkey,skM:skey, kme:key) = 
+out (c,pkM);
+in (c,x:bitstring);
+let (pkBx:pkey,y :bitstring) = adec (x,skM) in
+let (=pkM, k:key) =checksign(y,pkM) in
+new k :key;
+out (c,aenc(sign((pkBx,k),skM),pkBx));
+new uuid : bitstring;
+new realm: bitstring;
+new subj :bitstring;
+out (c,aenc(senc(HASH(uuid,realm,subj),pkM,kme),pkBx));
+in (c,final_sig:bitstring);
+let (pke0x:pkey,elisa:bitstring) = adec(final_sig,skM) in
+let (=pkM,k8:bitstring) = checksign(elisa,pkM) in
+0.
+
+
+let Bob (pkB:pkey,skB:skey) =
+in (c,pkx:pkey);
+new k: key;
+out(c,(aenc(sign((pkx,k),skB),pkx),pkB));
+in (c,x1:bitstring);
+let y1 = adec(x1,skB) in
+let (=pkB, k1:key) =checksign(y1,pkB) in
+out (c,pkB); 
+in (c,x2: bitstring);
+let (pkEx:pkey ,y2:bitstring) = adec(x2,skB) in
+let(=pkB ,k2:key)     =  checksign (y2,pkB) in
+in (c , x01 : bitstring);
+let y3 = adec(x01, skB) in
+out (c, aenc((y3,pkx),pkEx)).
+
+
+let Elisa (pkE:pkey,skE:skey,kme:key) =
+in(c, pkBy:pkey );
+new k2 :key;
+out (c, (aenc(sign((pkBy,k2),skE),pkBy),pkE));
+in (c,y02:bitstring);
+let z02:bitstring = adec (y02,skE) in
+let (=kme,pkM0:pkey,final:bitstring) = sdec(z02,kme) in  
+new k8:key;
+out (c, (aenc (sign((pkM0,k8),skE),pkM0),pkE)).
+ 
+process
+       
+       new sk0 : skey;
+       
+       new l:key;
+
+       
+       let sk=pk(sk0)in out ( c, sk );
+           (!Marbela(sk,sk0,l))|(!Bob(sk,sk0)) |(!Elisa(sk,sk0,l) )
