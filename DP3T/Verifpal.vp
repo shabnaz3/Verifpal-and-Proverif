@@ -1,0 +1,95 @@
+attacker[active]
+
+principal SmartphoneA[
+knows public BroadcastKey
+generates SK0A
+EphID00A, EphID01A, EphID02A = HKDF(nil, SK0A, BroadcastKey)
+]
+
+principal SmartphoneB[
+knows public BroadcastKey
+generates SK0B
+EphID00B, EphID01B, EphID02B = HKDF(nil, SK0B, BroadcastKey)
+]
+
+principal SmartphoneC[
+knows public BroadcastKey
+generates SK0C
+EphID00C, EphID01C, EphID02C = HKDF(nil, SK0C, BroadcastKey)
+]
+
+SmartphoneA → SmartphoneB: [EphID00A]
+SmartphoneB → SmartphoneA: [EphID00B]
+
+SmartphoneC → SmartphoneB: [EphID01C]
+SmartphoneB → SmartphoneC: [EphID01B]
+
+principal BackendServer[
+knows private infectedPatients0
+]
+
+
+BackendServer → SmartphoneA: infectedPatients0
+BackendServer → SmartphoneB: infectedPatients0
+BackendServer → SmartphoneC: infectedPatients0
+
+principal SmartphoneA[
+SK1A = HASH(SK0A)
+EphID10A, EphID11A, EphID12A = HKDF(nil, SK1A, BroadcastKey)
+]
+principal SmartphoneB[
+SK1B = HASH(SK0B)
+EphID10B, EphID11B, EphID12B = HKDF(nil, SK1B, BroadcastKey)
+]
+principal SmartphoneC[
+SK1C = HASH(SK0C)
+EphID10C, EphID11C, EphID12C = HKDF(nil, SK1C, BroadcastKey)
+]
+
+principal SmartphoneA[
+generates fever
+SK2A = HASH(fever,SK1A)
+EphID20A, EphID21A, EphID22A = HKDF(nil, SK2A, BroadcastKey)
+]
+
+
+
+principal HealthCareAuthority[
+generates triggerToken
+knows private ephemeral_sk
+m1 = ENC(ephemeral_sk, triggerToken)
+]
+
+HealthCareAuthority → BackendServer : [m1]
+HealthCareAuthority → SmartphoneA : [m1]
+
+principal SmartphoneA[
+knows private ephemeral_sk,ephemeral_sk1
+m1_dec = DEC(ephemeral_sk, m1)
+m2 = AEAD_ENC(ephemeral_sk1, SK2A, m1_dec)
+]
+SmartphoneA → BackendServer: [m2]
+
+principal BackendServer [
+knows private ephemeral_sk,ephemeral_sk1
+m2_dec = AEAD_DEC(ephemeral_sk1, m2, DEC(ephemeral_sk, m1))?
+infectedPatients1 = CONCAT(infectedPatients0, m2_dec)  //ei khane jodi concat er jaygay hash use kortam tahole ephid22 attack hoito na so server shobsi inform kortese ei joner affected but tar name k expose kortese na
+]
+BackendServer → SmartphoneA: [infectedPatients1]
+BackendServer → SmartphoneB: [infectedPatients1]
+BackendServer → SmartphoneC: [infectedPatients1]
+
+queries[
+
+
+confidentiality? EphID02A
+// Will people who came in contact with Alice be able to compute
+// all of Alice's EphIDs starting from Day 1
+
+authentication? HealthCareAuthority → SmartphoneA : m1
+
+confidentiality? EphID22A
+confidentiality? fever
+
+authentication? SmartphoneA → BackendServer: m2
+]
