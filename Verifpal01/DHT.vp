@@ -1,0 +1,89 @@
+attacker[active]
+
+principal Alice[
+    generates fingerprintA,uuidA
+    knows private a
+    ga = G^a
+    proofA=SIGN(a, fingerprintA)
+]
+Alice -> Bob:[proofA],[fingerprintA],[ga]
+principal Bob[
+    generates fingerprintB, seq0101
+    knows private b
+    gb = G^b
+    proofB =SIGN(b,fingerprintB) 
+    
+]
+Bob -> Alice:[proofB],[fingerprintB],[gb]
+principal Alice[
+    valid = SIGNVERIF(gb,fingerprintB,proofB)
+    shA =   gb^a
+]
+principal Bob[
+    validA = SIGNVERIF(ga,fingerprintB,proofA)
+    shBA = ga^b
+]
+Bob -> Carl:[proofB],[fingerprintB],[gb]
+principal Carl[
+    generates subj_dhl,seq01,fingerprintC,hndsM
+    knows private c,fpD
+    gc = G^c
+    proofC = SIGN(c,fingerprintC)
+    validB =SIGNVERIF(gb,fingerprintB,proofB)
+    shC = gb^c
+]
+
+Carl -> Bob :[proofC],[fingerprintC],[gc]
+
+principal Bob [
+    validC = SIGNVERIF(gc,fingerprintC,proofC)
+    shBC = gc^b
+]
+
+ principal Della[
+    knows private fpD      // fp =  fingerprint of Della
+]
+
+principal Carl[
+    dht_M  =  CONCAT(subj_dhl,seq01,fingerprintC,fpD) //dhk_M is  Message of dhk
+    dht = AEAD_ENC(shC,dht_M,nil) 
+]
+Carl -> Bob:[dht]
+
+principal Bob[
+    dht_dec = AEAD_DEC(shBC,dht,nil)
+    subj_dhl_,seq01_,fingerprintC_,fpD_= SPLIT(dht_dec)
+    dht_fingerprint = CONCAT(fingerprintB,fingerprintC_,fpD_)
+    dht_M1= CONCAT(subj_dhl_, seq01_, seq0101, dht_fingerprint)   // adding  Bob's sequence number, add bob's fingerprint instead of carl
+    dht01 = AEAD_ENC(shBA,dht_M1,nil)
+]
+Bob -> Alice :[dht01]
+
+principal Alice[
+    dht01_dec =AEAD_DEC(shA,dht01,nil)
+    subj_dhl_0, seq01_0, seq0101_, dht_fingerprint_=SPLIT(dht01_dec)
+    ping =AEAD_ENC(shA,nil,nil )
+]
+Alice ->Bob : [ping]
+
+principal Alice[
+    fingerprintB_,fingerprintC_0,fpD_0 = SPLIT(dht_fingerprint_)
+    _ = ASSERT(fingerprintB,fingerprintB_)?
+    ack= AEAD_ENC(shA,uuidA,fingerprintC_0) //here alice will generate uuid
+]
+Alice ->Bob:[ack],[fingerprintC_0]  
+principal Bob[
+    ack_dec =AEAD_DEC(shBA,ack,fingerprintC_0) 
+    DHT_Carl = AEAD_ENC(shBC,ack_dec,fingerprintA)
+]
+Bob ->Carl :[DHT_Carl],[fingerprintA]
+principal Carl[
+    DHT_Carl_dec = AEAD_DEC(shC,DHT_Carl,fingerprintA)
+]
+Carl -> Alice :[hndsM]
+
+ queries[
+    authentication? Carl -> Bob :proofC
+    confidentiality? shC
+    
+ ]
