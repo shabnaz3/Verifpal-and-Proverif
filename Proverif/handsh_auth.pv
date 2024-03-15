@@ -1,0 +1,152 @@
+(* define channel *)
+free c:channel.
+(* define key and session key *)
+type key.
+type sessionkey.
+free keyid:key [private].
+(* Public constants used for values of counters .counter is integer variable with an initial value of zero. Then you increment the counter to reflect the number of times a given object appears in the input data source *)
+
+free zero:bitstring.
+free one:bitstring.
+free two:bitstring.
+
+
+
+(* Message authentication failur and resynchronisation procedure between sender and reciver for message with identifier id .appplied ECU in double communication when message is not suitable for node  then it send auth_fail and update counter  *)
+
+free authfail:bitstring.
+
+(* creating function session key which take symmeteric key to encryption all messeage in one session*)
+
+fun sessionKeyGen(key, bitstring):sessionkey.
+fun sign (bitstring , sessionkey) : bitstring.
+fun checksign(sessionkey,bitstring) : sessionkey.
+
+(* Creating function of message  with using session key and two bitstring  *)
+
+fun MES(sessionkey, bitstring, bitstring): bitstring. 
+ 
+(* Query is used because proverif analyze this  and ensure that private key is secured. query attacker private key id is unreacable *)
+query attacker(keyid).   
+
+(* Events is used to get inserted into processes and gneralize the assertion(argument)  *)
+event authSuccess(sessionkey,bitstring). 
+event mesChecked(sessionkey,bitstring).
+
+query sk:sessionkey, mes:bitstring;  
+(* event authSuccess(session key and message)  has been executed, then the event MesChecked has also been executed before  *) 
+event(authSuccess(sk,mes))==>event(mesChecked(sk,mes)).  
+
+fun skk(sessionkey):sessionkey.
+
+
+
+
+letfun pp(x:bitstring)=     (* creating function with public veriable  which is incremented by 1 for new session  *)
+       if x=zero then one
+       else if x=one then two
+       else if x=two then zero
+.
+
+(* creating session key gen function which create session key for given epoch (for certain time).the function increase this epoch by 1(thats why using pp (public variable) session key is gnerated using sessionKeyGen  ,using shared key(keyid) and new epoch.This then returns the new epoch and the session key  *)
+
+
+letfun session_key_gen(eid:bitstring)=  
+       let eidpp:bitstring = pp(eid) in
+       let sk = sessionKeyGen(keyid, eidpp) in
+       let sk1=checksign(sk,eidpp) in
+       let sk2 =sign(eidpp,sk1) in
+       (eidpp,sk,sk1,sk2)
+.
+
+(* Function to update the current counter and epoch. Also takes the current session key so it can return this or a new one at the end of the function.Checks if the counter is two. If so, adding one would cause it to over flow so it instead creates a new session key (which increases the epoch) and returns zero as the new counter, the new epoch from the session_key_gen function and the new session key.If the counter is not two then it instead increases it by 1 and then returns the new counter, the current epoch and session key. ( counter is two when session key and epoch is new . session key is new when I need new public variable.public variable is necessary for Public constants (value of counter).counter is important creating two or more session)*)
+
+letfun update_counters(cid:bitstring,eid:bitstring, sk:sessionkey)=
+       if cid=two then (
+       	  let (eidpp:bitstring, newsk:sessionkey) = session_key_gen(eid) in
+	         (zero,eidpp, newsk)
+	)
+    	else let cidpp = pp(cid) in (cidpp,eid,sk)
+.
+
+
+
+(* A Function to check if one bitstring is larger than another *)
+
+letfun isGreatherThan(x:bitstring, y:bitstring)=
+       if x = zero && y <> zero then true
+       else if x=one  && y=two then true
+       else false
+       
+.
+
+(*The Sender Process which takes the counter, epoch and session key so they start off with the same value. *)
+let s(cid:bitstring, eid:bitstring, sk:sessionkey)=
+
+(* creating new message *)
+    new msg:bitstring;
+	   
+    
+    
+(* call the update counter function to create new counter new epoch new session key *)
+    let (cid1:bitstring, eid1:bitstring, newsk:sessionkey) = update_counters(cid, eid, sk) in
+    out(c,(cid1, msg));
+    
+    
+    
+    
+(*pass the output of sender through the channel  with new counter and using MES fuction which contain new session key new counter and new message *)
+    out(c,(cid1,MES(newsk,cid1,msg)));
+    
+    
+    
+    
+    
+    
+(* reply in bitstring*)
+    in(c,reply:bitstring);
+    
+ (*if reply is authfail,i.e  Receiver couldnt authenticate this sender, update current counters.*)
+    if reply = authfail then
+      let (cid2:bitstring, eid2:bitstring, newsk2:sessionkey) = update_counters(cid1, eid1, newsk) in
+       out(c,(cid2,eid2));
+       out(c,(cid2,MES(newsk2,cid2,eid2)));
+       0
+    else
+	event authSuccess(newsk,MES(newsk,cid1,msg));
+	0
+       
+.
+
+(* The Receiver which takes the counter, epoch and session key so they start off with the same value.*)
+
+let r(cid:bitstring, eid:bitstring, sk:sessionkey)=
+(* Update current counters *)
+    let (cid1:bitstring, eid1:bitstring, newsk:sessionkey) = update_counters(cid, eid, sk) in
+ (*Receive the senders counter and a message followed by the senders counter again and the MES from the sessin key, counter and message. *)
+    in(c,(scid:bitstring,msg:bitstring));
+    in(c,(=scid,mes:bitstring));
+    
+(* the MES received from the sender and make sure it matches the one we generate *)
+   
+    let mescheck=MES(newsk, cid1,msg) in
+(*If the MES matches the one we generated then the sender has been successfully authenticated. We can trigger the event to confirm this.*) 
+    if mes=mescheck then
+       event mesChecked(newsk,mescheck);
+
+       0
+     else
+(* Authentication Failed. *)
+       0
+.
+process
+ 
+     new sk1 : sessionkey ;
+     new m: bitstring ;  
+        
+
+(*call session key gen function  creating sessio key with private key and public constanat value of counter *)	
+     let sk=checksign(sk1,m) in  out ( c, sk );
+	
+(*| = session key is matching, dont knw about !*)
+    (!s(zero,zero,sk))|(!r(zero,zero,sk))
