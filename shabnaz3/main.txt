@@ -1,0 +1,48 @@
+from fastapi import FastAPI
+from pydantic import BaseModel
+from pydantic import BaseSettings
+
+app = FastAPI()
+
+
+class Item(BaseModel):
+    name: str
+    os: str | None = None
+    port: float
+    python: float = 10.5
+    tags: list[str] = []
+
+
+
+
+items = {
+    "foo": {"name": "Foo", "port": 50.2},
+    "bar": {"name": "Bar", "os": "window", "port": 62, "python": 20.2},
+    "baz": {"name": "Baz", "os": None, "port": 50.2, "python": 10.5, "tags": []},
+}
+
+@app.get("/items/{item_id}", response_model=Item, response_model_exclude_unset=True)
+async def read_item(item_id: str):
+    return items[item_id]
+import os
+import platform
+import socket
+
+
+
+class Title(BaseModel):
+    os:str
+    version:str
+    processor:str
+    hostname:str
+    ip:str
+
+
+
+@app.get("/os_info/", response_model=Title,response_model_exclude_unset=True)
+async def read_item():
+    return Title(os=f"{platform.system()}",
+                 version=f"{platform.release()}",
+                 processor=f"{platform.processor()}",
+                 hostname=f"{socket.gethostname()}",
+                 ip=f"{socket.gethostbyname(socket.gethostname())}",)
