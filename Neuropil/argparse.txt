@@ -1,0 +1,35 @@
+import argparse
+from neuropil import NeuropilNode, np_token, np_message, neuropil
+parser = argparse.ArgumentParser(description='Process some integers.') #creating Object ArgumentParser using argparse.the object cotains all information
+parser.add_argument('--port',type=int,help='the node port') #the object will be completed by calling add argument .Add argument is used for puting attribute 
+                                                            #in the object(for stored)
+parser.add_argument('--join', nargs="?",type=str, help='The node to join') #nargs is number of argument why do you  use this      
+                                                                            # to join one node to another node                                              
+parser.add_argument('--subject',type=str,help='The subject to use for node') # define another atribute subject and type 
+parser.add_argument('--type',type=str, choices=["receiver","sender"], help='The type of the node')#here is identified sender and reciver
+args=parser.parse_args() 
+print(args.subject)
+
+def authz_cb(node:NeuropilNode, token:np_token): #create_authorization_method_Suppose_You_enter_the_resurant_you_are_authorized_check_kora_k_bujhay
+    print("authorizing")
+    return True
+
+def my_callbacl_function(node:NeuropilNode, token: np_message):
+    print(f"cb is called for subject {args.subject}")
+
+node = NeuropilNode(args.port) #node define the port using neuropilNode
+node.set_authenticate_cb(authz_cb)
+node.set_authorize_cb(authz_cb)
+
+if args.type == "receiver": #make the type 
+    node.set_receive_cb(args.subject, my_callbacl_function)  #calling the function my_callback_function
+
+if args.join:
+    node.join(args.join)
+
+print(node.get_address())
+
+while node.run(1) == neuropil.np_ok:
+    if args.type == "reciver ":
+        print("sending data")
+        node.send(args.subject,"data")
