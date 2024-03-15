@@ -1,0 +1,80 @@
+(*uuid,subject,audience,realm,issuer,signature,issue:condiion,public key,secretkey*)
+
+
+free c:channel.
+type key.
+type pk.
+type pkey.
+type skey.
+type spkey.
+type sskey [private].
+
+
+
+fun aenc (bitstring,pkey):bitstring.
+fun adec (bitstring,skey):bitstring.
+fun senc (bitstring,pkey ):key.
+fun sdec(bitstring,pkey):key.
+fun sign(bitstring,skey):bitstring.
+fun checksign(bitstring,skey):bitstring.
+fun comb(skey,sskey):skey .      
+free zero:pkey.
+free zero1 :spkey.
+free sg:spkey [private].
+free s1:skey.
+free s2:sskey[private].
+free g:bitstring [private] .
+fun key_to_public(pkey,skey):pkey [private].
+fun public(pkey):skey.
+
+fun HASH(bitstring,bitstring,bitstring,bitstring):bitstring.
+
+query attacker(s2).
+
+let Sender (pkA : pkey , skA : skey , pkB : spkey ) =
+out(c, pkA );
+let k =key_to_public(pkA,skA)in
+out (c,k);
+
+in (c, m0:bitstring);
+let m0_dec = sdec(m0,pkA) in
+new uuid1: bitstring;
+new subject1 :bitstring;
+new realm1 :bitstring;
+new issuer1: bitstring;
+out (c, aenc(sign(aenc( HASH ( uuid1,subject1,realm1,issuer1 ), k ),skA),k));
+in (c,m1222:bitstring);
+let m1222_dec = adec(m1222,skA) in
+if m1222_dec =  HASH ( uuid1,subject1,realm1,issuer1 ) then
+new nb:bitstring;
+out (c,nb );
+0
+else
+0
+.
+let Reciver (pkeyB:pkey, skeyB : skey , skB : sskey ) =
+in (c, pkX:pkey);
+in (c,KX:pkey);
+let kX = public(KX) in
+new m:bitstring;
+out(c,senc(m, pkX));
+in (c,m1:bitstring);
+let m10=adec(m1,kX) in
+ let m11 = checksign(m10,kX) in
+ let m12 =adec(m11,kX) in
+  out (c,aenc(m12,pkX)).
+
+
+
+
+
+      
+process
+       
+       new skA : skey;
+       new skB: sskey;
+       new pkB:pkey;
+
+       
+       let sk=comb(skA,skB)in out ( c, sk );
+           (!Sender(zero,sk,zero1))|(!Reciver(pkB,sk,skB))
