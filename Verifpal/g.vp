@@ -1,0 +1,11 @@
+attracker[active]
+principal Server [
+knows private s
+gs = G^s
+]
+principal Client[
+knows private c
+gc = G^c
+generates nonce
+]
+Server→ Client: gs, proof
